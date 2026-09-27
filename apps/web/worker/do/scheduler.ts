@@ -113,8 +113,19 @@ export class SchedulerDO extends DurableObject<Bindings> {
         inputSize: state.inputSize,
         spec: meta.spec,
       };
-      const res = await this.engineFetch(jobId, "/run", payload);
-      if (!res.ok) throw new Error(`motor respondió ${res.status}`);
+      // El primer arranque de un contenedor puede tardar (imagen grande): reintentar una vez.
+      let res = await this.engineFetch(jobId, "/run", payload);
+      if (!res.ok && res.status >= 500) {
+        const detail = (await res.text().catch(() => "")).slice(0, 300);
+        console.error(`[scheduler] motor ${res.status} para ${jobId}: ${detail}`);
+        await new Promise((r) => setTimeout(r, 15_000));
+        res = await this.engineFetch(jobId, "/run", payload);
+      }
+      if (!res.ok) {
+        const detail = (await res.text().catch(() => "")).slice(0, 300);
+        console.error(`[scheduler] motor ${res.status} para ${jobId}: ${detail}`);
+        throw new Error(`motor respondió ${res.status}${detail ? `: ${detail}` : ""}`);
+      }
     } catch (err) {
       await job.failed(`No se pudo iniciar el procesamiento: ${err instanceof Error ? err.message : String(err)}`);
       await this.finished(jobId);
