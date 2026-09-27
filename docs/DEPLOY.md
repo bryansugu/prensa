@@ -4,11 +4,14 @@ Arquitectura: el Worker `prensa` sirve la SPA y la API (R2 + Durable Objects + C
 Un proyecto Pages `prensa-domain` da la entrada `pdf.cdc.cool` con un CNAME en GoDaddy (sin mover la zona).
 Todo se despliega solo con cada push a `main` (Workers Builds y Pages Git integration).
 
-## Ya hecho
+## Estado (27-09-2026)
 
-- Plan Workers Paid activo, R2 habilitado, `wrangler login` en esta máquina.
-- Bucket `prensa-files` con reglas de ciclo de vida: objetos expiran a 1 día, multipart incompletos se abortan a 1 día.
-- `account_id` en `apps/web/wrangler.jsonc`.
+- Plan Workers Paid activo en la cuenta `0fb5353f7d8afc6bd569381d97dad56a` (ojo: un primer pago quedó en otra cuenta; cancelarlo allí).
+- R2: bucket `prensa-files` con ciclo de vida (objetos expiran a 1 día, multipart incompletos a 1 día).
+- Worker `prensa` conectado a GitHub con Workers Builds (root `apps/web`); URL `https://prensa.bsuarezg.workers.dev`.
+  Secreto `INTERNAL_SECRET` cargado. Contenedor `prensa-enginecontainer` creado (standard-3, máx. 2).
+- Pages `prensa-domain` conectado (root `apps/domain`) → `https://prensa-domain.pages.dev` reenvía al Worker.
+- Pendiente: custom domain `pdf.cdc.cool` en Pages + `CNAME pdf → prensa-domain.pages.dev` en GoDaddy.
 
 ## Paso 1 — Conectar el Worker al repo (Workers Builds)
 
