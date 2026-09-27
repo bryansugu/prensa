@@ -25,6 +25,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @prensa/web cf:types
+      - run: pnpm --filter @prensa/web routes
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
