@@ -1,0 +1,42 @@
+# deps
+node_modules/
+.pnpm-store/
+
+# builds
+dist/
+build/
+.wrangler/
+.turbo/
+*.tsbuildinfo
+apps/web/worker-configuration.d.ts
+
+# env / secrets
+.env
+.env.*
+!.env.example
+.dev.vars
+.dev.vars.*
+
+# tests & bench artifacts
+coverage/
+playwright-report/
+test-results/
+tools/bench/corpus/**/*.pdf
+tools/bench/out/
+tools/bench/report.*
+
+# os / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# generado por TanStack Router (tsr generate)
+apps/web/src/routeTree.gen.ts

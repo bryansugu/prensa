@@ -1,0 +1,26 @@
+{
+  "name": "@prensa/engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "AGPL-3.0-only",
+  "exports": {
+    ".": "./src/index.ts",
+    "./worker": "./src/worker/engine.worker.ts",
+    "./client": "./src/worker/client.ts",
+    "./node": "./src/node.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@jsquash/jpeg": "^1.6.0",
+    "@jsquash/resize": "^2.1.1",
+    "@prensa/schema": "workspace:*",
+    "comlink": "^4.4.2",
+    "fflate": "^0.8.3",
+    "mupdf": "^1.28.1",
+    "ssim.js": "^3.5.0"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "prensa",
+  "main": "./worker/index.ts",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  // La SPA se sirve como Static Assets desde el mismo Worker (un solo deploy).
+  "assets": {
+    "not_found_handling": "single-page-application",
+    "binding": "ASSETS"
+  },
+  "observability": { "enabled": true },
+  "vars": {
+    "APP_NAME": "Prensa",
+    "APP_VERSION": "0.1.0"
+  }
+  // Fase 3 (nube): r2_buckets, durable_objects (JobDO, SchedulerDO, QuotaDO), containers.
+}

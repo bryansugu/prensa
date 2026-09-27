@@ -1,0 +1,81 @@
+/*
+ * Puente Polen → utilidades de Tailwind 4.
+ * tokens.css (generado por Polen) expone las primitivas (--type-*, --ds-radius-*, --ds-shadow-*,
+ * --ds-ease-*) pero su bloque @theme solo mapea colores y --font-body. Los componentes de Polen
+ * usan text-md, rounded-md, shadow-xs, ease-move…; este archivo crea esas utilidades.
+ */
+@theme inline {
+  --font-sans: var(--font-body);
+
+  /* Tipografía: text-xs…text-2xl, text-heading-*, text-display-* (con line-height pareado) */
+  --text-xs: var(--type-text-xs);
+  --text-xs--line-height: var(--type-text-xs--line-height);
+  --text-sm: var(--type-text-sm);
+  --text-sm--line-height: var(--type-text-sm--line-height);
+  --text-md: var(--type-text-md);
+  --text-md--line-height: var(--type-text-md--line-height);
+  --text-base: var(--type-text-md);
+  --text-base--line-height: var(--type-text-md--line-height);
+  --text-lg: var(--type-text-lg);
+  --text-lg--line-height: var(--type-text-lg--line-height);
+  --text-xl: var(--type-text-xl);
+  --text-xl--line-height: var(--type-text-xl--line-height);
+  --text-2xl: var(--type-text-2xl);
+  --text-2xl--line-height: var(--type-text-2xl--line-height);
+  --text-heading-xs: var(--type-heading-xs);
+  --text-heading-xs--line-height: var(--type-heading-xs--line-height);
+  --text-heading-sm: var(--type-heading-sm);
+  --text-heading-sm--line-height: var(--type-heading-sm--line-height);
+  --text-heading-md: var(--type-heading-md);
+  --text-heading-md--line-height: var(--type-heading-md--line-height);
+  --text-heading-lg: var(--type-heading-lg);
+  --text-heading-lg--line-height: var(--type-heading-lg--line-height);
+  --text-heading-xl: var(--type-heading-xl);
+  --text-heading-xl--line-height: var(--type-heading-xl--line-height);
+  --text-heading-2xl: var(--type-heading-2xl);
+  --text-heading-2xl--line-height: var(--type-heading-2xl--line-height);
+  --text-display-xs: var(--type-display-xs);
+  --text-display-xs--line-height: var(--type-display-xs--line-height);
+  --text-display-sm: var(--type-display-sm);
+  --text-display-sm--line-height: var(--type-display-sm--line-height);
+  --text-display-md: var(--type-display-md);
+  --text-display-md--line-height: var(--type-display-md--line-height);
+  --text-display-lg: var(--type-display-lg);
+  --text-display-lg--line-height: var(--type-display-lg--line-height);
+  --text-display-xl: var(--type-display-xl);
+  --text-display-xl--line-height: var(--type-display-xl--line-height);
+  --text-display-2xl: var(--type-display-2xl);
+  --text-display-2xl--line-height: var(--type-display-2xl--line-height);
+
+  /* Radius: rounded-xxs…rounded-4xl */
+  --radius-xxs: var(--ds-radius-xxs);
+  --radius-xs: var(--ds-radius-xs);
+  --radius-sm: var(--ds-radius-sm);
+  --radius-md: var(--ds-radius-md);
+  --radius-lg: var(--ds-radius-lg);
+  --radius-xl: var(--ds-radius-xl);
+  --radius-2xl: var(--ds-radius-2xl);
+  --radius-3xl: var(--ds-radius-3xl);
+  --radius-4xl: var(--ds-radius-4xl);
+
+  /* Elevación: shadow-xs…shadow-2xl */
+  --shadow-xs: var(--ds-shadow-xs);
+  --shadow-sm: var(--ds-shadow-sm);
+  --shadow-md: var(--ds-shadow-md);
+  --shadow-lg: var(--ds-shadow-lg);
+  --shadow-xl: var(--ds-shadow-xl);
+  --shadow-2xl: var(--ds-shadow-2xl);
+
+  /* Motion: ease-enter/exit/move/emphasis */
+  --ease-enter: var(--ds-ease-enter);
+  --ease-exit: var(--ds-ease-exit);
+  --ease-move: var(--ds-ease-move);
+  --ease-emphasis: var(--ds-ease-emphasis);
+
+  /* Tracking para mayúsculas */
+  --tracking-xs: var(--ds-tracking-xs);
+  --tracking-sm: var(--ds-tracking-sm);
+  --tracking-md: var(--ds-tracking-md);
+  --tracking-lg: var(--ds-tracking-lg);
+  --tracking-xl: var(--ds-tracking-xl);
+}

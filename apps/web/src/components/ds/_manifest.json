@@ -1,0 +1,230 @@
+{
+  "registry": "https://polen.cdc.cool/r",
+  "syncedAt": "2026-09-27T17:36:20.178Z",
+  "items": {
+    "tokens": {
+      "files": {
+        "src/styles/tokens.css": "ee7535914e24"
+      },
+      "dependencies": []
+    },
+    "accordion": {
+      "files": {
+        "src/components/ds/accordion.tsx": "a837609fd36f"
+      },
+      "dependencies": [
+        "@base-ui/react"
+      ]
+    },
+    "alert": {
+      "files": {
+        "src/components/ds/alert.tsx": "935bdd7175c5"
+      },
+      "dependencies": []
+    },
+    "avatar": {
+      "files": {
+        "src/components/ds/avatar.tsx": "530c2940ffa9"
+      },
+      "dependencies": [
+        "@base-ui/react"
+      ]
+    },
+    "badge": {
+      "files": {
+        "src/components/ds/badge.tsx": "9dc93c5b7831"
+      },
+      "dependencies": []
+    },
+    "breadcrumb": {
+      "files": {
+        "src/components/ds/breadcrumb.tsx": "24d4b2876db0"
+      },
+      "dependencies": []
+    },
+    "button": {
+      "files": {
+        "src/components/ds/button.tsx": "cdfd168a7f6f"
+      },
+      "dependencies": []
+    },
+    "card": {
+      "files": {
+        "src/components/ds/card.tsx": "92473bec1a76"
+      },
+      "dependencies": []
+    },
+    "checkbox": {
+      "files": {
+        "src/components/ds/checkbox.tsx": "d5b46180fcc8"
+      },
+      "dependencies": [
+        "@base-ui/react"
+      ]
+    },
+    "divider": {
+      "files": {
+        "src/components/ds/divider.tsx": "b626e4b43844"
+      },
+      "dependencies": []
+    },
+    "drawer": {
+      "files": {
+        "src/components/ds/drawer.tsx": "ac697856bee6"
+      },
+      "dependencies": [
+        "@base-ui/react"
+      ]
+    },
+    "empty-state": {
+      "files": {
+        "src/components/ds/empty-state.tsx": "441e40ad5367"
+      },
+      "dependencies": []
+    },
+    "icons": {
+      "files": {
+        "src/components/ds/icons.tsx": "01d1695823cf"
+      },
+      "dependencies": []
+    },
+    "input-code": {
+      "files": {
+        "src/components/ds/input-code.tsx": "e96c57593a52"
+      },
+      "dependencies": [
+        "@base-ui/react"
+      ]
+    },
+    "input": {
+      "files": {
+        "src/components/ds/input.tsx": "24fc9bad4227"
+      },
+      "dependencies": [
+        "@base-ui/react"
+      ]
+    },
+    "item-content": {
+      "files": {
+        "src/components/ds/item-content.tsx": "c7bfd58097e6"
+      },
+      "dependencies": []
+    },
+    "link": {
+      "files": {
+        "src/components/ds/link.tsx": "3c7df8acba25"
+      },
+      "dependencies": []
+    },
+    "menu": {
+      "files": {
+        "src/components/ds/menu.tsx": "0f68f0117eb3"
+      },
+      "dependencies": [
+        "@base-ui/react"
+      ]
+    },
+    "modal": {
+      "files": {
+        "src/components/ds/modal.tsx": "fc597b2f2197"
+      },
+      "dependencies": [
+        "@base-ui/react"
+      ]
+    },
+    "pagination": {
+      "files": {
+        "src/components/ds/pagination.tsx": "f6403b0828b3"
+      },
+      "dependencies": []
+    },
+    "popover": {
+      "files": {
+        "src/components/ds/popover.tsx": "ecf03c960369"
+      },
+      "dependencies": [
+        "@base-ui/react"
+      ]
+    },
+    "progress": {
+      "files": {
+        "src/components/ds/progress.tsx": "e54b40c0cb46"
+      },
+      "dependencies": [
+        "@base-ui/react"
+      ]
+    },
+    "radio": {
+      "files": {
+        "src/components/ds/radio.tsx": "e128300a3464"
+      },
+      "dependencies": [
+        "@base-ui/react"
+      ]
+    },
+    "select": {
+      "files": {
+        "src/components/ds/select.tsx": "120607683cc8"
+      },
+      "dependencies": [
+        "@base-ui/react"
+      ]
+    },
+    "skeleton": {
+      "files": {
+        "src/components/ds/skeleton.tsx": "cfe6b5a71510"
+      },
+      "dependencies": []
+    },
+    "spinner": {
+      "files": {
+        "src/components/ds/spinner.tsx": "531a46849161"
+      },
+      "dependencies": []
+    },
+    "stepper": {
+      "files": {
+        "src/components/ds/stepper.tsx": "f31be42e1fb6"
+      },
+      "dependencies": []
+    },
+    "switch": {
+      "files": {
+        "src/components/ds/switch.tsx": "95cc2e402e7a"
+      },
+      "dependencies": [
+        "@base-ui/react"
+      ]
+    },
+    "table": {
+      "files": {
+        "src/components/ds/table.tsx": "84323e98be66"
+      },
+      "dependencies": []
+    },
+    "tabs": {
+      "files": {
+        "src/components/ds/tabs.tsx": "2ce8898ddab1"
+      },
+      "dependencies": [
+        "@base-ui/react"
+      ]
+    },
+    "toast": {
+      "files": {
+        "src/components/ds/toast.tsx": "2839c1645fe5"
+      },
+      "dependencies": [
+        "@base-ui/react"
+      ]
+    },
+    "tooltip": {
+      "files": {
+        "src/components/ds/tooltip.tsx": "e1d9a564ff7d"
+      },
+      "dependencies": [
+        "@base-ui/react"
+      ]
+    }
+  }
+}

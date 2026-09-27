@@ -1,0 +1,21 @@
+packages:
+  - apps/*
+  - packages/*
+  - tools
+
+# pnpm ≥10 bloquea scripts de build por defecto; estos son necesarios.
+allowBuilds:
+  esbuild: true
+  workerd: true
+  sharp: true
+
+# Protección de cadena de suministro de pnpm 12: excepciones para versiones recientes que usamos.
+minimumReleaseAgeExclude:
+  - '@cloudflare/vite-plugin@1.61.0'
+  - '@tanstack/react-router@1.170.40'
+  - '@tanstack/router-core@1.171.33'
+  - '@tanstack/router-generator@1.167.39'
+  - '@tanstack/router-plugin@1.168.41'
+  - miniflare@5.20260926.0-alpha
+  - wrangler@4.142.0
+  - '@tanstack/router-cli@1.167.39'

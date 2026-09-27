@@ -1,0 +1,51 @@
+@import "tailwindcss";
+@import "./tokens.css";
+@import "./theme.css";
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* PP Neue Montreal Variable — la voz tipográfica de Polen (licencia FDS, self-hosted). */
+@font-face {
+  font-family: "PP Neue Montreal";
+  src: url("/fonts/PPNeueMontreal-wght.woff2") format("woff2");
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --font-pp-neue: "PP Neue Montreal", ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+@layer base {
+  html {
+    font-family: var(--font-body);
+    font-weight: var(--ds-weight-medium);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    scroll-behavior: smooth;
+  }
+  body {
+    min-height: 100dvh;
+    background-color: var(--bg);
+    color: var(--fg);
+  }
+  /* Cifras tabulares para tamaños, porcentajes y contadores alineados */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  ::selection {
+    background: var(--primary-subtle-active, var(--primary-5));
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}

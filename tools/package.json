@@ -1,0 +1,14 @@
+{
+  "name": "@prensa/tools",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "AGPL-3.0-only",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@prensa/engine": "workspace:*",
+    "@prensa/schema": "workspace:*"
+  }
+}

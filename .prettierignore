@@ -1,0 +1,8 @@
+dist
+node_modules
+.wrangler
+pnpm-lock.yaml
+apps/web/src/components/ds
+apps/web/src/styles/tokens.css
+apps/web/src/routeTree.gen.ts
+tools/bench/out

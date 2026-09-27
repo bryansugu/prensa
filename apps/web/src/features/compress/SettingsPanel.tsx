@@ -1,0 +1,236 @@
+import { PRESETS, formatBytes, type PresetId } from "@prensa/schema";
+import { Accordion, AccordionItem } from "@/components/ds/accordion";
+import { Button } from "@/components/ds/button";
+import { Input } from "@/components/ds/input";
+import { Select } from "@/components/ds/select";
+import { Switch } from "@/components/ds/switch";
+import { cn } from "@/lib/cn";
+import { PRESET_META, formatPercent } from "./presets";
+import { selectTotals, useCompressStore } from "./store";
+
+const DPI_OPTIONS = [
+  { value: "auto", label: "Según el preset" },
+  ...[72, 96, 110, 150, 200, 300, 600].map((d) => ({ value: String(d), label: `${d} dpi` })),
+];
+const QUALITY_OPTIONS = [
+  { value: "auto", label: "Según el preset" },
+  ...[50, 60, 70, 75, 80, 85, 90, 95].map((q) => ({ value: String(q), label: `${q}` })),
+];
+
+export function SettingsPanel() {
+  const spec = useCompressStore((s) => s.spec);
+  const files = useCompressStore((s) => s.files);
+  const setSpec = useCompressStore((s) => s.setSpec);
+  const setPreset = useCompressStore((s) => s.setPreset);
+  const resetSpec = useCompressStore((s) => s.resetSpec);
+
+  const estimateFor = (preset: PresetId) => selectTotals(files, preset);
+  const anyReady = files.some((f) => f.report);
+
+  return (
+    <div className="flex flex-col gap-6">
+      <section aria-labelledby="presets-title" className="flex flex-col gap-3">
+        <div>
+          <h2 id="presets-title" className="text-lg font-semibold text-fg">
+            Nivel de compresión
+          </h2>
+          <p className="text-sm text-fg-muted">Cada imagen se verifica con SSIM: si pierde calidad visible, se sube la calidad.</p>
+        </div>
+        <div role="radiogroup" aria-labelledby="presets-title" className="grid gap-2">
+          {PRESET_META.map((meta) => {
+            const selected = spec.preset === meta.id;
+            const totals = estimateFor(meta.id);
+            const Icon = meta.icon;
+            const def = PRESETS[meta.id];
+            return (
+              <button
+                key={meta.id}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                onClick={() => setPreset(meta.id)}
+                className={cn(
+                  "flex items-start gap-3 rounded-xl border p-3 text-left transition-colors duration-(--ds-duration-fast) ease-move outline-none",
+                  "focus-visible:shadow-[0_0_0_2px_var(--bg),0_0_0_4px_var(--focus-ring)]",
+                  selected
+                    ? "border-primary-border-strong bg-primary-faint"
+                    : "border-border bg-bg-elevated hover:border-border-strong hover:bg-bg-subtle",
+                )}
+              >
+                <span
+                  aria-hidden
+                  className={cn(
+                    "mt-0.5 grid size-8 shrink-0 place-items-center rounded-full text-[18px]",
+                    selected ? "bg-primary text-primary-fg" : "bg-surface text-icon-muted",
+                  )}
+                >
+                  <Icon />
+                </span>
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="flex items-baseline justify-between gap-2">
+                    <span className="text-sm font-semibold text-fg">{meta.label}</span>
+                    {anyReady && totals.ready > 0 && (
+                      <span className="tabular shrink-0 text-xs text-fg-muted">
+                        ≈ {formatBytes(totals.estimated)}{" "}
+                        <span className="text-success-text">−{formatPercent(1 - totals.estimated / Math.max(1, totals.original))}</span>
+                      </span>
+                    )}
+                  </span>
+                  <span className="text-xs text-fg-muted">{meta.description}</span>
+                  {def.photoQuality != null && (
+                    <span className="mt-1 text-xs text-fg-subtle">
+                      JPEG {def.photoQuality} · SSIM ≥ {def.minSsim.toFixed(2)}
+                    </span>
+                  )}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <Accordion variant="divider" toggle="chevron" size="sm">
+        <AccordionItem title="Imágenes">
+          <div className="flex flex-col gap-3 pb-2">
+            <Select
+              size="sm"
+              label="Color"
+              value={spec.images.color}
+              onValueChange={(v) => v && setSpec((s) => ({ ...s, images: { ...s.images, color: v as typeof s.images.color } }))}
+              options={[
+                { value: "keep", label: "Mantener colores" },
+                { value: "grayscale", label: "Escala de grises" },
+                { value: "bilevel", label: "Blanco y negro (1 bit)" },
+              ]}
+            />
+            <Select
+              size="sm"
+              label="Resolución objetivo"
+              value={spec.images.colorDpi == null ? "auto" : String(spec.images.colorDpi)}
+              onValueChange={(v) =>
+                setSpec((s) => ({ ...s, images: { ...s.images, colorDpi: !v || v === "auto" ? null : Number(v) } }))
+              }
+              options={DPI_OPTIONS}
+            />
+            <Select
+              size="sm"
+              label="Calidad JPEG"
+              value={spec.images.jpegQuality == null ? "auto" : String(spec.images.jpegQuality)}
+              onValueChange={(v) =>
+                setSpec((s) => ({ ...s, images: { ...s.images, jpegQuality: !v || v === "auto" ? null : Number(v) } }))
+              }
+              options={QUALITY_OPTIONS}
+            />
+            <Switch
+              size="sm"
+              label="Blanco y negro automático en escaneos de texto"
+              supporting="Umbral adaptativo: mucho más liviano, sin grises"
+              checked={spec.scan.bilevel === "auto"}
+              onCheckedChange={(checked) => setSpec((s) => ({ ...s, scan: { ...s.scan, bilevel: checked ? "auto" : "off" } }))}
+            />
+          </div>
+        </AccordionItem>
+
+        <AccordionItem title="Conservar">
+          <div className="flex flex-col gap-3 pb-2">
+            {(
+              [
+                ["links", "Enlaces"],
+                ["forms", "Formularios rellenables"],
+                ["annotations", "Comentarios y anotaciones"],
+                ["bookmarks", "Marcadores"],
+                ["tags", "Etiquetas de accesibilidad"],
+                ["layers", "Capas"],
+                ["attachments", "Archivos adjuntos"],
+                ["encryption", "Cifrado existente"],
+              ] as const
+            ).map(([key, label]) => (
+              <Switch
+                key={key}
+                size="sm"
+                label={label}
+                checked={spec.preserve[key]}
+                onCheckedChange={(checked) => setSpec((s) => ({ ...s, preserve: { ...s.preserve, [key]: checked } }))}
+              />
+            ))}
+          </div>
+        </AccordionItem>
+
+        <AccordionItem title="Eliminar">
+          <div className="flex flex-col gap-3 pb-2">
+            <Select
+              size="sm"
+              label="Metadatos"
+              value={spec.remove.metadata}
+              onValueChange={(v) => v && setSpec((s) => ({ ...s, remove: { ...s.remove, metadata: v as typeof s.remove.metadata } }))}
+              options={[
+                { value: "basic", label: "Solo título, autor y asunto" },
+                { value: "keep", label: "Conservar todo" },
+                { value: "none", label: "Eliminar todo" },
+              ]}
+            />
+            {(
+              [
+                ["thumbnails", "Miniaturas embebidas"],
+                ["javascript", "JavaScript y acciones automáticas"],
+                ["pieceInfo", "Datos privados de aplicaciones (Illustrator, InDesign…)"],
+                ["structureTree", "Estructura de accesibilidad"],
+              ] as const
+            ).map(([key, label]) => (
+              <Switch
+                key={key}
+                size="sm"
+                label={label}
+                checked={spec.remove[key]}
+                onCheckedChange={(checked) => setSpec((s) => ({ ...s, remove: { ...s.remove, [key]: checked } }))}
+              />
+            ))}
+          </div>
+        </AccordionItem>
+
+        <AccordionItem title="Aplanar">
+          <div className="flex flex-col gap-3 pb-2">
+            <Switch
+              size="sm"
+              label="Aplanar formularios"
+              supporting="Los campos dejan de ser editables y quedan como dibujo"
+              checked={spec.flatten.forms}
+              onCheckedChange={(checked) => setSpec((s) => ({ ...s, flatten: { ...s.flatten, forms: checked } }))}
+            />
+            <Switch
+              size="sm"
+              label="Aplanar anotaciones"
+              checked={spec.flatten.annotations}
+              onCheckedChange={(checked) => setSpec((s) => ({ ...s, flatten: { ...s.flatten, annotations: checked } }))}
+            />
+            <Switch
+              size="sm"
+              label="Rasterizar todo (cada página → imagen)"
+              supporting="Compresión extrema: se pierde el texto seleccionable"
+              checked={spec.mode === "rasterize"}
+              onCheckedChange={(checked) => setSpec((s) => ({ ...s, mode: checked ? "rasterize" : "preserve" }))}
+            />
+          </div>
+        </AccordionItem>
+
+        <AccordionItem title="Salida">
+          <div className="flex flex-col gap-3 pb-2">
+            <Input
+              size="sm"
+              label="Nombre del archivo"
+              hint="{original} se reemplaza por el nombre original"
+              value={spec.output.namePattern}
+              onChange={(e) => setSpec((s) => ({ ...s, output: { ...s.output, namePattern: e.target.value || "{original}-comprimido" } }))}
+            />
+          </div>
+        </AccordionItem>
+      </Accordion>
+
+      <div>
+        <Button variant="text" size="sm" radius="semi" onClick={resetSpec}>
+          Restablecer ajustes
+        </Button>
+      </div>
+    </div>
+  );
+}

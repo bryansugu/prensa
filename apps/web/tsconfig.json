@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable", "WebWorker"],
+    "jsx": "react-jsx",
+    // Los componentes generados por Polen no están escritos para exactOptionalPropertyTypes.
+    "exactOptionalPropertyTypes": false,
+    "types": ["vite/client", "node", "./worker-configuration.d.ts"],
+    "baseUrl": ".",
+    "paths": { "@/*": ["./src/*"] }
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "worker/**/*.ts", "vite.config.ts", "vitest.config.ts"]
+}
