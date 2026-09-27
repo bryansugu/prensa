@@ -34,11 +34,14 @@ export interface CompressResult {
 
 class EngineWorker {
   private docs = new Map<string, OpenDoc>();
+  private aborts = new Map<string, AbortController>();
   private mupdfPromise: Promise<Mu> | null = null;
+  private mupdfReady: Mu | null = null;
 
   private mupdf(): Promise<Mu> {
     this.mupdfPromise ??= (async () => {
       const [mu] = await Promise.all([loadMupdf(), initCodecs()]);
+      this.mupdfReady = mu;
       return mu;
     })();
     return this.mupdfPromise;
@@ -75,11 +78,51 @@ class EngineWorker {
   ): Promise<CompressResult> {
     const mu = await this.mupdf();
     const entry = this.must(id);
-    const out = await compressPdf(mu, entry.bytes, { ...spec, password: entry.password }, {
-      fileName: entry.name,
-      onProgress: onProgress ? (e) => void onProgress(e) : undefined,
-    });
-    return Comlink.transfer({ bytes: out.bytes, result: out.result }, [out.bytes.buffer as ArrayBuffer]);
+    const controller = new AbortController();
+    this.aborts.set(id, controller);
+    try {
+      const out = await compressPdf(mu, entry.bytes, { ...spec, password: entry.password }, {
+        fileName: entry.name,
+        signal: controller.signal,
+        onProgress: onProgress ? (e) => void onProgress(e) : undefined,
+      });
+      // Copia para el comparador: el original queda abierto; el resultado se
+      // abre bajo `${id}:out` (se cierra con closeOutput o close).
+      this.setOutput(id, out.bytes.slice());
+      return Comlink.transfer({ bytes: out.bytes, result: out.result }, [out.bytes.buffer as ArrayBuffer]);
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") throw new Error("CANCELLED", { cause: err });
+      throw err;
+    } finally {
+      this.aborts.delete(id);
+    }
+  }
+
+  /** Cancela una compresión en curso (se aplica entre imágenes/etapas). */
+  cancel(id: string): boolean {
+    const c = this.aborts.get(id);
+    if (!c) return false;
+    c.abort();
+    return true;
+  }
+
+  /** Abre el PDF resultante bajo `${id}:out` para renderizar el comparador. */
+  private setOutput(id: string, bytes: Uint8Array): void {
+    const key = `${id}:out`;
+    this.close(key);
+    const entry = this.docs.get(id);
+    const mu = this.mupdfReady;
+    if (!entry || !mu) return;
+    try {
+      const doc = openDocument(mu, bytes, entry.password);
+      this.docs.set(key, { bytes, name: entry.name, password: entry.password, doc });
+    } catch {
+      /* sin comparador para este archivo */
+    }
+  }
+
+  closeOutput(id: string): void {
+    this.close(`${id}:out`);
   }
 
   /** Renderiza una página del documento abierto a PNG. */
@@ -115,6 +158,7 @@ class EngineWorker {
   }
 
   close(id: string): void {
+    if (!id.endsWith(":out")) this.close(`${id}:out`);
     const entry = this.docs.get(id);
     if (!entry) return;
     try {

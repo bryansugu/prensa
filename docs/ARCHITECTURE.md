@@ -57,3 +57,22 @@ workers (`engine-pool.ts`, hasta 3 workers, un archivo vive en un worker). UI co
 
 `pnpm bench` (tools/bench/run.ts) corre presets sobre `tools/bench/corpus/*.pdf` y escribe
 `tools/bench/out/report.md` con tamaño, ahorro, tiempo, SSIM de página, texto, interactividad y `qpdf --check`.
+
+## Accesibilidad
+
+- Auditoría automática con axe (WCAG 2.0/2.1 A y AA) en los tests e2e (`apps/web/e2e`), en la página inicial,
+  con resultados y con el comparador abierto.
+- La regla `color-contrast` se evalúa aparte porque el verde de marca de Polen (`primary-9 = #00922e`) sobre
+  blanco da **4,08:1**, por debajo del mínimo AA (4,5:1) para texto menor de 18,66 px en negrita. Afecta a
+  Button fill/stroke, Badge tonal y `primary/text` sobre `primary/subtle`. Es una decisión del sistema de
+  diseño: conviene revisarla en Polen (por ejemplo, `primary/solid` = primary-10 `#038329` sube a ~4,4:1 y
+  `primary-11 #018228` a ~4,6:1). En esta app se evitan esas combinaciones en textos propios (se usa `text-fg`
+  o `text-fg-muted`).
+
+## Tests end-to-end
+
+```bash
+pnpm --filter @prensa/web test:e2e     # genera fixtures (tsx e2e/make-fixtures.ts) y corre Playwright
+```
+Cubren: lote de 5 archivos → ZIP, cancelación, perfiles (guardar/restablecer/aplicar/persistir), comparador
+con navegación de páginas, historial, versión móvil (drawer + barra inferior, sin scroll horizontal).

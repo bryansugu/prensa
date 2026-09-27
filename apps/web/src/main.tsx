@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import "./styles/globals.css";
 import { routeTree } from "./routeTree.gen";
 import { initTheme } from "./lib/theme";
+import { registerSW } from "virtual:pwa-register";
 
 const router = createRouter({
   routeTree,
@@ -18,6 +19,8 @@ declare module "@tanstack/react-router" {
 }
 
 initTheme();
+// Service worker: la app (incluido el motor WASM) queda disponible sin conexión.
+registerSW({ immediate: true });
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

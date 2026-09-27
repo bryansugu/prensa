@@ -15,6 +15,7 @@ import {
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { pool } from "./engine-pool";
+import { useHistoryStore } from "./history";
 
 export type FileStatus = "opening" | "analyzing" | "ready" | "compressing" | "done" | "error" | "password";
 
@@ -33,6 +34,8 @@ export interface FileEntry {
   outputUrl: string | null;
   outputName: string | null;
   error: string | null;
+  /** true si la última compresión se canceló */
+  cancelled: boolean;
 }
 
 interface CompressState {
@@ -46,7 +49,12 @@ interface CompressState {
   resetSpec: () => void;
   compressAll: () => Promise<void>;
   compressOne: (id: string) => Promise<void>;
+  cancel: (id: string) => void;
+  cancelAll: () => void;
   unlock: (id: string, password: string) => Promise<void>;
+  /** Avisar con una notificación del sistema cuando termine y la pestaña esté oculta */
+  notify: boolean;
+  setNotify: (on: boolean) => void;
 }
 
 const MAX_FILES = 50;
@@ -67,6 +75,7 @@ function revoke(entry: FileEntry) {
 function errorMessage(err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err);
   if (raw.includes("PASSWORD_REQUIRED")) return "PASSWORD_REQUIRED";
+  if (raw.includes("CANCELLED")) return "CANCELLED";
   if (/not a PDF|no objects found|cannot find startxref|unknown format/i.test(raw)) return "El archivo no es un PDF válido o está dañado.";
   if (/memory|allocation|out of memory|RangeError/i.test(raw)) return "No hay memoria suficiente en el navegador para este archivo. Prueba con un archivo más pequeño.";
   return raw || "Error desconocido";
@@ -131,6 +140,7 @@ export const useCompressStore = create<CompressState>()(
           outputUrl: null,
           outputName: null,
           error: null,
+          cancelled: false,
         }));
         set({ files: [...current, ...entries] });
         for (const e of entries) void openAndAnalyze(e.id);
@@ -164,7 +174,7 @@ export const useCompressStore = create<CompressState>()(
         if (!entry.report) return;
         const spec = get().spec;
         if (entry.outputUrl) URL.revokeObjectURL(entry.outputUrl);
-        patch(id, { status: "compressing", progress: { stage: "open", progress: 0 }, result: null, outputUrl: null, error: null });
+        patch(id, { status: "compressing", progress: { stage: "open", progress: 0 }, result: null, outputUrl: null, error: null, cancelled: false });
         try {
           const { bytes, result } = await pool.run(entry.slot, (api) =>
             api.compress(
@@ -175,18 +185,45 @@ export const useCompressStore = create<CompressState>()(
           );
           if (!getEntry(id)) return;
           const outputUrl = URL.createObjectURL(new Blob([bytes as BlobPart], { type: "application/pdf" }));
+          const outputName = outputFileName(spec.output.namePattern, entry.name);
           patch(id, {
             status: "done",
             result,
             outputUrl,
-            outputName: outputFileName(spec.output.namePattern, entry.name),
+            outputName,
             progress: { stage: "done", progress: 1 },
           });
+          useHistoryStore.getState().add({
+            id,
+            name: entry.name,
+            originalSize: result.originalSize,
+            outputSize: result.outputSize,
+            savings: result.savings,
+            preset: result.preset,
+            durationMs: result.durationMs,
+            at: new Date().toISOString(),
+          });
+          notifyIfHidden(entry.name, result.savings);
         } catch (err) {
           if (!getEntry(id)) return;
-          patch(id, { status: "error", error: errorMessage(err), progress: null });
+          const message = errorMessage(err);
+          if (message === "CANCELLED") patch(id, { status: "ready", progress: null, cancelled: true });
+          else patch(id, { status: "error", error: message, progress: null });
         }
       },
+
+      cancel: (id) => {
+        const entry = getEntry(id);
+        if (!entry || entry.status !== "compressing") return;
+        void pool.direct(entry.slot).cancel(id);
+      },
+
+      cancelAll: () => {
+        for (const f of get().files) if (f.status === "compressing") get().cancel(f.id);
+      },
+
+      notify: false,
+      setNotify: (on) => set({ notify: on }),
 
       compressAll: async () => {
         const ids = get()
@@ -210,16 +247,35 @@ export const useCompressStore = create<CompressState>()(
     {
       name: "prensa:compress-spec",
       version: 1,
-      // Solo persistimos los ajustes (sin contraseña); los archivos viven en memoria.
-      partialize: (s) => ({ spec: { ...s.spec, password: undefined } }),
+      // Solo persistimos los ajustes (sin contraseña) y la preferencia de aviso; los archivos viven en memoria.
+      partialize: (s) => ({ spec: { ...s.spec, password: undefined }, notify: s.notify }),
       merge: (persisted, current) => {
-        const p = persisted as { spec?: unknown } | undefined;
+        const p = persisted as { spec?: unknown; notify?: unknown } | undefined;
         const parsed = CompressionSpec.safeParse(p?.spec);
-        return { ...current, spec: parsed.success ? parsed.data : current.spec };
+        return { ...current, spec: parsed.success ? parsed.data : current.spec, notify: p?.notify === true };
       },
     },
   ),
 );
+
+function notifyIfHidden(name: string, savings: number): void {
+  if (!useCompressStore.getState().notify) return;
+  if (typeof document === "undefined" || !document.hidden) return;
+  if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+  try {
+    const n = new Notification("Prensa · PDF listo", {
+      body: `${name} · ${Math.round(savings * 100)} % más liviano`,
+      tag: `prensa-${name}`,
+      icon: "/icon-192.png",
+    });
+    n.onclick = () => {
+      window.focus();
+      n.close();
+    };
+  } catch {
+    /* sin notificaciones */
+  }
+}
 
 /** Totales útiles para la UI. */
 export function selectTotals(files: FileEntry[], preset: PresetId) {

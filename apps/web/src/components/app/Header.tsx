@@ -37,7 +37,7 @@ export function Header() {
               aria-disabled={!tool.ready}
               className={
                 tool.ready
-                  ? "rounded-md px-3 py-1.5 text-sm font-medium text-fg hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring [&.active]:bg-primary-subtle [&.active]:text-primary-text"
+                  ? "rounded-md px-3 py-1.5 text-sm font-medium text-fg hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring [&.active]:bg-primary-subtle [&.active]:text-fg"
                   : "pointer-events-none rounded-md px-3 py-1.5 text-sm text-fg-disabled"
               }
               activeOptions={{ exact: true }}

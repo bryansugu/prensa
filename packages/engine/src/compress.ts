@@ -109,6 +109,9 @@ export async function compressPdf(
     const total = refs.length;
     const ctx = { mupdf, doc, params, spec, signal: opts.signal };
     for (let i = 0; i < total; i++) {
+      // Cede el event loop: en el worker esto permite procesar cancel() y
+      // otros mensajes entre imágenes (los awaits internos son solo microtareas).
+      await yieldToEventLoop();
       throwIfAborted(opts.signal);
       const ref = refs[i]!;
       const info = analysis.imageInfos.get(ref.objectNumber)!;
@@ -307,6 +310,10 @@ export function measureBreakdown(doc: PDFDocument, fileSize: number): SizeBreakd
   const metadata = streamLength(resolveDict(get(root, "Metadata")));
   const content = walk.contentBytes;
   return { images, fonts, content, metadata, other: Math.max(0, fileSize - images - fonts - content - metadata) };
+}
+
+function yieldToEventLoop(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 function clamp01(n: number): number {

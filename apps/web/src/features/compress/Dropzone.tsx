@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
+import { useId, useRef, useState, type DragEvent } from "react";
 import { UploadCloud } from "@/components/app/icons";
 import { Shield } from "@/components/app/icons";
 import { cn } from "@/lib/cn";
@@ -26,20 +26,12 @@ export function Dropzone({ compact = false, onFiles }: DropzoneProps) {
     if (files.length) onFiles(files);
   };
 
-  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      open();
-    }
-  };
-
   return (
     <div
-      role="button"
-      tabIndex={0}
-      aria-describedby={`${inputId}-hint`}
-      onClick={open}
-      onKeyDown={onKeyDown}
+      onClick={(e) => {
+        // El input es el control real (focusable, con label). El resto del área solo delega el clic.
+        if ((e.target as HTMLElement).tagName !== "INPUT") open();
+      }}
       onDragOver={(e) => {
         e.preventDefault();
         if (!dragging) setDragging(true);
@@ -48,7 +40,7 @@ export function Dropzone({ compact = false, onFiles }: DropzoneProps) {
       onDrop={onDrop}
       className={cn(
         "group relative flex w-full cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed text-center outline-none transition-colors duration-(--ds-duration-fast) ease-move",
-        "focus-visible:shadow-[0_0_0_2px_var(--bg),0_0_0_4px_var(--focus-ring)]",
+        "focus-within:shadow-[0_0_0_2px_var(--bg),0_0_0_4px_var(--focus-ring)]",
         dragging
           ? "border-primary bg-primary-subtle"
           : "border-border bg-bg-elevated hover:border-primary-border hover:bg-primary-faint",
@@ -61,8 +53,9 @@ export function Dropzone({ compact = false, onFiles }: DropzoneProps) {
         type="file"
         accept="application/pdf,.pdf"
         multiple
+        aria-label="Elegir archivos PDF"
+        aria-describedby={`${inputId}-hint`}
         className="sr-only"
-        tabIndex={-1}
         onChange={(e) => {
           const files = e.target.files ? Array.from(e.target.files) : [];
           if (files.length) onFiles(files);

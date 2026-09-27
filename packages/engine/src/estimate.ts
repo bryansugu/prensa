@@ -47,7 +47,7 @@ export function estimateImage(img: ImageInfo, preset: PresetId, threshold = 1.15
   const pixels = img.width * img.height * scale;
   const gray = img.components === 1 && img.colorSpace !== "Indexed";
   let bpp: number;
-  if (img.kind === "graphic") bpp = 1.0;
+  if (img.kind === "graphic") bpp = 0.35; // paleta + Flate en gráficos planos
   else bpp = bitsPerPixelForQuality(p.photoQuality) * (gray ? 0.6 : 1) * (p.chroma === "444" ? 1.25 : 1);
   const est = Math.round((pixels * bpp) / 8) + 200;
   return Math.min(img.bytes, est);

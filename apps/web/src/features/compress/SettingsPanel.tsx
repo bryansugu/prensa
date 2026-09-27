@@ -1,4 +1,6 @@
 import { PRESETS, formatBytes, type PresetId } from "@prensa/schema";
+import { useState } from "react";
+import { Trash } from "@/components/app/icons";
 import { Accordion, AccordionItem } from "@/components/ds/accordion";
 import { Button } from "@/components/ds/button";
 import { Input } from "@/components/ds/input";
@@ -6,6 +8,7 @@ import { Select } from "@/components/ds/select";
 import { Switch } from "@/components/ds/switch";
 import { cn } from "@/lib/cn";
 import { PRESET_META, formatPercent } from "./presets";
+import { useProfilesStore } from "./profiles";
 import { selectTotals, useCompressStore } from "./store";
 
 const DPI_OPTIONS = [
@@ -23,6 +26,10 @@ export function SettingsPanel() {
   const setSpec = useCompressStore((s) => s.setSpec);
   const setPreset = useCompressStore((s) => s.setPreset);
   const resetSpec = useCompressStore((s) => s.resetSpec);
+  const profiles = useProfilesStore((s) => s.profiles);
+  const saveProfile = useProfilesStore((s) => s.save);
+  const removeProfile = useProfilesStore((s) => s.remove);
+  const [profileName, setProfileName] = useState("");
 
   const estimateFor = (preset: PresetId) => selectTotals(files, preset);
   const anyReady = files.some((f) => f.report);
@@ -222,6 +229,58 @@ export function SettingsPanel() {
               value={spec.output.namePattern}
               onChange={(e) => setSpec((s) => ({ ...s, output: { ...s.output, namePattern: e.target.value || "{original}-comprimido" } }))}
             />
+          </div>
+        </AccordionItem>
+
+        <AccordionItem title={profiles.length ? `Perfiles (${profiles.length})` : "Perfiles"}>
+          <div className="flex flex-col gap-3 pb-2">
+            {profiles.length > 0 && (
+              <ul className="flex flex-col gap-1" aria-label="Perfiles guardados">
+                {profiles.map((p) => (
+                  <li key={p.id} className="flex items-center gap-2">
+                    <Button
+                      variant="tonal"
+                      size="sm"
+                      radius="semi"
+                      className="min-w-0 flex-1 justify-start"
+                      onClick={() => setSpec(() => p.spec)}
+                      title={`Aplicar «${p.name}»`}
+                    >
+                      <span className="truncate">{p.name}</span>
+                    </Button>
+                    <Button
+                      variant="text"
+                      size="sm"
+                      radius="semi"
+                      iconOnly={<Trash />}
+                      aria-label={`Eliminar perfil ${p.name}`}
+                      onClick={() => removeProfile(p.id)}
+                    />
+                  </li>
+                ))}
+              </ul>
+            )}
+            <form
+              className="flex items-end gap-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!profileName.trim()) return;
+                saveProfile(profileName, spec);
+                setProfileName("");
+              }}
+            >
+              <Input
+                size="sm"
+                label="Guardar los ajustes actuales como"
+                placeholder="p. ej. Para clientes"
+                value={profileName}
+                onChange={(e) => setProfileName(e.target.value)}
+                className="flex-1"
+              />
+              <Button type="submit" variant="stroke" size="sm" radius="semi" disabled={!profileName.trim()}>
+                Guardar
+              </Button>
+            </form>
           </div>
         </AccordionItem>
       </Accordion>

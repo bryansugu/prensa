@@ -40,3 +40,6 @@ pnpm-debug.log*
 
 # generado por TanStack Router (tsr generate)
 apps/web/src/routeTree.gen.ts
+
+# fixtures generados por Playwright (global-setup)
+apps/web/e2e/fixtures/

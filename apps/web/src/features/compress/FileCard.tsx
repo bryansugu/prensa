@@ -1,6 +1,6 @@
 import { formatBytes } from "@prensa/schema";
 import { useState } from "react";
-import { Download, FileText, Refresh, Trash } from "@/components/app/icons";
+import { Download, FileText, Refresh, Scan, Trash } from "@/components/app/icons";
 import { Alert } from "@/components/ds/alert";
 import { Badge } from "@/components/ds/badge";
 import { Button } from "@/components/ds/button";
@@ -9,6 +9,7 @@ import { Progress } from "@/components/ds/progress";
 import { Skeleton } from "@/components/ds/skeleton";
 import { Tooltip } from "@/components/ds/tooltip";
 import { BreakdownBar } from "./BreakdownBar";
+import { CompareViewer } from "./CompareViewer";
 import { downloadUrl } from "./download";
 import { DOC_TYPE_LABEL, FEATURE_FLAGS, STAGE_LABEL, formatPercent } from "./presets";
 import { useCompressStore, type FileEntry } from "./store";
@@ -18,7 +19,9 @@ export function FileCard({ entry }: { entry: FileEntry }) {
   const removeFile = useCompressStore((s) => s.removeFile);
   const compressOne = useCompressStore((s) => s.compressOne);
   const unlock = useCompressStore((s) => s.unlock);
+  const cancel = useCompressStore((s) => s.cancel);
   const [password, setPassword] = useState("");
+  const [compareOpen, setCompareOpen] = useState(false);
 
   const report = entry.report;
   const estimate = report?.estimates[preset];
@@ -113,6 +116,11 @@ export function FileCard({ entry }: { entry: FileEntry }) {
 
         {entry.status === "ready" && report && (
           <div className="flex flex-col gap-2">
+            {entry.cancelled && (
+              <p className="text-sm text-fg-muted" role="status">
+                Compresión cancelada.
+              </p>
+            )}
             <BreakdownBar breakdown={report.breakdown} total={report.fileSize} />
             {estimate && (
               <p className="text-sm text-fg-muted">
@@ -130,16 +138,23 @@ export function FileCard({ entry }: { entry: FileEntry }) {
         )}
 
         {entry.status === "compressing" && entry.progress && (
-          <Progress
-            value={Math.round(entry.progress.progress * 100)}
-            size="sm"
-            showValue
-            label={
-              entry.progress.current && entry.progress.total
-                ? `${STAGE_LABEL[entry.progress.stage]} · ${entry.progress.current}/${entry.progress.total}`
-                : STAGE_LABEL[entry.progress.stage]
-            }
-          />
+          <div className="flex items-end gap-3">
+            <div className="min-w-0 flex-1">
+              <Progress
+                value={Math.round(entry.progress.progress * 100)}
+                size="sm"
+                showValue
+                label={
+                  entry.progress.current && entry.progress.total
+                    ? `${STAGE_LABEL[entry.progress.stage]} · ${entry.progress.current}/${entry.progress.total}`
+                    : STAGE_LABEL[entry.progress.stage]
+                }
+              />
+            </div>
+            <Button variant="stroke" size="sm" radius="semi" onClick={() => cancel(entry.id)}>
+              Cancelar
+            </Button>
+          </div>
         )}
 
         {entry.status === "done" && entry.result && (
@@ -159,7 +174,7 @@ export function FileCard({ entry }: { entry: FileEntry }) {
                   sin cambios
                 </Badge>
               )}
-              <span className="text-sm text-fg-subtle tabular">
+              <span className="text-sm text-fg-muted tabular">
                 {(entry.result.durationMs / 1000).toLocaleString("es", { maximumFractionDigits: 1 })} s
               </span>
             </div>
@@ -187,10 +202,14 @@ export function FileCard({ entry }: { entry: FileEntry }) {
               >
                 Descargar
               </Button>
+              <Button variant="stroke" size="sm" radius="semi" iconLeft={<Scan />} onClick={() => setCompareOpen(true)}>
+                Comparar
+              </Button>
               <Button variant="text" size="sm" radius="semi" iconLeft={<Refresh />} onClick={() => void compressOne(entry.id)}>
-                Recomprimir con los ajustes actuales
+                Recomprimir
               </Button>
             </div>
+            {compareOpen && <CompareViewer entry={entry} open={compareOpen} onOpenChange={setCompareOpen} />}
           </div>
         )}
 

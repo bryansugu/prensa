@@ -21,7 +21,8 @@
     "format:check": "prettier --check .",
     "ds:sync": "tsx tools/polen-sync.ts",
     "bench": "tsx tools/bench/run.ts",
-    "deploy": "pnpm --filter @prensa/web deploy"
+    "deploy": "pnpm --filter @prensa/web deploy",
+    "test:e2e": "pnpm --filter @prensa/web test:e2e"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

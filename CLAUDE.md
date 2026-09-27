@@ -10,6 +10,7 @@ pnpm install            # deps (los builds de esbuild/workerd están permitidos 
 pnpm ds:sync            # sincroniza Polen desde https://polen.cdc.cool/r → apps/web/src/components/ds
 pnpm dev                # Vite + Worker local (http://localhost:5173)
 pnpm test               # vitest en todos los workspaces (motor: PDFs sintéticos con MuPDF)
+pnpm test:e2e           # Playwright (genera fixtures con tsx; Chromium ya instalado con `playwright install chromium`)
 pnpm typecheck          # tsc por workspace (apps/web genera worker-configuration.d.ts con `pnpm -F @prensa/web cf:types`)
 pnpm lint               # eslint (type-aware)
 pnpm bench              # benchmark del motor sobre tools/bench/corpus

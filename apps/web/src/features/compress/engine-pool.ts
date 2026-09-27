@@ -53,6 +53,14 @@ export class EnginePool {
     return task;
   }
 
+  /**
+   * Acceso directo al worker del slot, fuera de la cola. Solo para llamadas
+   * que deben llegar mientras otra operación está en curso (cancel).
+   */
+  direct(slot: number): EngineClient {
+    return this.api(slot);
+  }
+
   /** Mata el worker del slot (cancelación dura) y lo recrea perezosamente. */
   reset(slot: number): void {
     const s = this.slots[slot];

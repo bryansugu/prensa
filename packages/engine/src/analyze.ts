@@ -5,7 +5,8 @@
  */
 import type { AnalysisReport, DocFeatures, DocType, ImageInfo, SizeBreakdown } from "@prensa/schema";
 import { estimateAll } from "./estimate";
-import { classifyCheap } from "./images/classify";
+import { classify, classifyCheap, computeStats } from "./images/classify";
+import { decodeImage } from "./images/pixels";
 import { primaryFilter } from "./images/process";
 import type { Mu, PDFDocument, PDFObject } from "./mupdf";
 import { asBool, asName, asNumber, colorSpaceInfo, forEachEntry, get, has, resolveArray, resolveDict, streamLength } from "./pdf/objects";
@@ -90,6 +91,22 @@ export function analyzeDocument(
       occurrences: pl ? pl.occurrences : ref.references,
       kind: classifyCheap({ width, height, bitsPerComponent: bpc, isStencilMask: isMask, bytes, filter }),
     };
+    // Para imágenes pequeñas decodificamos y clasificamos con estadísticas reales:
+    // distingue gráfico plano (paleta) de foto y afina mucho las estimaciones.
+    if ((info.kind === "photo" || info.kind === "unknown") && width * height <= 4_000_000) {
+      const decoded = decodeImage(mupdf, doc, ref.ref, false);
+      if (decoded) {
+        info.kind = classify({
+          width,
+          height,
+          bitsPerComponent: bpc,
+          isStencilMask: isMask,
+          bytes,
+          filter,
+          stats: computeStats(decoded.rgba),
+        });
+      }
+    }
     imageInfos.set(ref.objectNumber, info);
     imageBytes += bytes;
   }
