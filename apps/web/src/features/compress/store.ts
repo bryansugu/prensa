@@ -9,15 +9,17 @@ import {
   outputFileName,
   type AnalysisReport,
   type CompressionResult,
+  type JobState,
   type PresetId,
   type ProgressEvent,
 } from "@prensa/schema";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { cancelCloudJob, createCloudJob, deleteCloudJob, uploadToCloud, watchCloudJob } from "./cloud";
 import { pool } from "./engine-pool";
 import { useHistoryStore } from "./history";
 
-export type FileStatus = "opening" | "analyzing" | "ready" | "compressing" | "done" | "error" | "password";
+export type FileStatus = "opening" | "analyzing" | "ready" | "compressing" | "uploading" | "cloud" | "done" | "error" | "password";
 
 export interface FileEntry {
   id: string;
@@ -36,6 +38,8 @@ export interface FileEntry {
   error: string | null;
   /** true si la última compresión se canceló */
   cancelled: boolean;
+  /** Estado del trabajo en la nube (si el archivo se procesó allí) */
+  cloud: JobState | null;
 }
 
 interface CompressState {
@@ -55,7 +59,15 @@ interface CompressState {
   /** Avisar con una notificación del sistema cuando termine y la pestaña esté oculta */
   notify: boolean;
   setNotify: (on: boolean) => void;
+  /** Código de acceso a la nube (si el servidor lo exige) */
+  cloudAccessCode: string;
+  setCloudAccessCode: (code: string) => void;
+  processInCloud: (id: string) => Promise<void>;
+  deleteFromCloud: (id: string) => Promise<void>;
 }
+
+const watchers = new Map<string, () => void>();
+const uploadAborts = new Map<string, AbortController>();
 
 const MAX_FILES = 50;
 
@@ -141,6 +153,7 @@ export const useCompressStore = create<CompressState>()(
           outputName: null,
           error: null,
           cancelled: false,
+          cloud: null,
         }));
         set({ files: [...current, ...entries] });
         for (const e of entries) void openAndAnalyze(e.id);
@@ -149,6 +162,10 @@ export const useCompressStore = create<CompressState>()(
       removeFile: (id) => {
         const entry = getEntry(id);
         if (!entry) return;
+        watchers.get(id)?.();
+        watchers.delete(id);
+        uploadAborts.get(id)?.abort();
+        uploadAborts.delete(id);
         revoke(entry);
         pool.release(entry.slot);
         void pool.run(entry.slot, async (api) => api.close(id)).catch(() => undefined);
@@ -157,6 +174,8 @@ export const useCompressStore = create<CompressState>()(
 
       clear: () => {
         for (const f of get().files) {
+          watchers.get(f.id)?.();
+          uploadAborts.get(f.id)?.abort();
           revoke(f);
           pool.release(f.slot);
           void pool.run(f.slot, async (api) => api.close(f.id)).catch(() => undefined);
@@ -173,6 +192,7 @@ export const useCompressStore = create<CompressState>()(
         if (!entry || (entry.status !== "ready" && entry.status !== "done" && entry.status !== "error")) return;
         if (!entry.report) return;
         const spec = get().spec;
+        if (spec.cloud.enabled) return get().processInCloud(id);
         if (entry.outputUrl) URL.revokeObjectURL(entry.outputUrl);
         patch(id, { status: "compressing", progress: { stage: "open", progress: 0 }, result: null, outputUrl: null, error: null, cancelled: false });
         try {
@@ -214,12 +234,96 @@ export const useCompressStore = create<CompressState>()(
 
       cancel: (id) => {
         const entry = getEntry(id);
-        if (!entry || entry.status !== "compressing") return;
-        void pool.direct(entry.slot).cancel(id);
+        if (!entry) return;
+        if (entry.status === "compressing") void pool.direct(entry.slot).cancel(id);
+        else if (entry.status === "uploading") uploadAborts.get(id)?.abort();
+        else if (entry.status === "cloud" && entry.cloud) void cancelCloudJob(entry.cloud.id);
       },
 
       cancelAll: () => {
-        for (const f of get().files) if (f.status === "compressing") get().cancel(f.id);
+        for (const f of get().files) if (f.status === "compressing" || f.status === "uploading" || f.status === "cloud") get().cancel(f.id);
+      },
+
+      cloudAccessCode: "",
+      setCloudAccessCode: (code) => set({ cloudAccessCode: code }),
+
+      processInCloud: async (id) => {
+        const entry = getEntry(id);
+        if (!entry) return;
+        const spec = get().spec;
+        watchers.get(id)?.();
+        watchers.delete(id);
+        if (entry.outputUrl) URL.revokeObjectURL(entry.outputUrl);
+        const abort = new AbortController();
+        uploadAborts.set(id, abort);
+        patch(id, { status: "uploading", progress: { stage: "upload", progress: 0, message: "Subiendo" }, result: null, outputUrl: null, error: null, cancelled: false, cloud: null });
+        try {
+          const uploaded = await uploadToCloud(entry.file, {
+            accessCode: get().cloudAccessCode || undefined,
+            signal: abort.signal,
+            onProgress: (f) => patch(id, { progress: { stage: "upload", progress: f, message: "Subiendo" } }),
+          });
+          if (!getEntry(id)) return;
+          const job = await createCloudJob({
+            uploadKey: uploaded.key,
+            fileName: entry.name,
+            inputSize: uploaded.size,
+            spec: { ...spec, password: undefined },
+            accessCode: get().cloudAccessCode || undefined,
+          });
+          patch(id, { status: "cloud", cloud: job, progress: { stage: "queued", progress: 0, message: job.message ?? undefined } });
+          const stop = watchCloudJob(job.id, (state) => {
+            const current = getEntry(id);
+            if (!current) return;
+            if (state.status === "done" && state.result) {
+              patch(id, {
+                status: "done",
+                cloud: state,
+                result: state.result,
+                outputUrl: state.downloadUrl,
+                outputName: state.outputName ?? outputFileName(spec.output.namePattern, entry.name),
+                progress: { stage: "done", progress: 1 },
+              });
+              useHistoryStore.getState().add({
+                id,
+                name: entry.name,
+                originalSize: state.result.originalSize,
+                outputSize: state.result.outputSize,
+                savings: state.result.savings,
+                preset: state.result.preset,
+                durationMs: state.result.durationMs,
+                at: new Date().toISOString(),
+              });
+              notifyIfHidden(entry.name, state.result.savings);
+            } else if (state.status === "failed") {
+              patch(id, { status: "error", cloud: state, error: state.error ?? "Error en la nube", progress: null });
+            } else if (state.status === "cancelled") {
+              patch(id, { status: "ready", cloud: null, cancelled: true, progress: null });
+            } else if (state.status === "expired") {
+              patch(id, { cloud: state, outputUrl: null });
+            } else {
+              patch(id, {
+                status: "cloud",
+                cloud: state,
+                progress: { stage: state.stage ?? "processing", progress: state.progress, message: state.message ?? undefined },
+              });
+            }
+          });
+          watchers.set(id, stop);
+        } catch (err) {
+          if (!getEntry(id)) return;
+          if (abort.signal.aborted) patch(id, { status: "ready", progress: null, cancelled: true });
+          else patch(id, { status: "error", error: errorMessage(err), progress: null });
+        } finally {
+          uploadAborts.delete(id);
+        }
+      },
+
+      deleteFromCloud: async (id) => {
+        const entry = getEntry(id);
+        if (!entry?.cloud) return;
+        await deleteCloudJob(entry.cloud.id);
+        patch(id, { cloud: { ...entry.cloud, status: "expired", downloadUrl: null }, outputUrl: null });
       },
 
       notify: false,
@@ -248,11 +352,16 @@ export const useCompressStore = create<CompressState>()(
       name: "prensa:compress-spec",
       version: 1,
       // Solo persistimos los ajustes (sin contraseña) y la preferencia de aviso; los archivos viven en memoria.
-      partialize: (s) => ({ spec: { ...s.spec, password: undefined }, notify: s.notify }),
+      partialize: (s) => ({ spec: { ...s.spec, password: undefined }, notify: s.notify, cloudAccessCode: s.cloudAccessCode }),
       merge: (persisted, current) => {
-        const p = persisted as { spec?: unknown; notify?: unknown } | undefined;
+        const p = persisted as { spec?: unknown; notify?: unknown; cloudAccessCode?: unknown } | undefined;
         const parsed = CompressionSpec.safeParse(p?.spec);
-        return { ...current, spec: parsed.success ? parsed.data : current.spec, notify: p?.notify === true };
+        return {
+          ...current,
+          spec: parsed.success ? parsed.data : current.spec,
+          notify: p?.notify === true,
+          cloudAccessCode: typeof p?.cloudAccessCode === "string" ? p.cloudAccessCode : "",
+        };
       },
     },
   ),

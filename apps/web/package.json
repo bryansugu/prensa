@@ -6,7 +6,7 @@
   "license": "AGPL-3.0-only",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && tsx container/build.ts",
     "preview": "vite preview",
     "typecheck": "tsr generate && tsc -p tsconfig.json",
     "test": "vitest run",
@@ -14,7 +14,9 @@
     "deploy": "vite build && wrangler deploy",
     "routes": "tsr generate",
     "test:e2e": "tsx e2e/make-fixtures.ts && playwright test",
-    "test:e2e:ui": "tsx e2e/make-fixtures.ts && playwright test --ui"
+    "test:e2e:ui": "tsx e2e/make-fixtures.ts && playwright test --ui",
+    "build:container": "tsx container/build.ts",
+    "dev:engine": "INTERNAL_SECRET=dev-secret-cambiar PORT=8080 tsx container/src/runner.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
@@ -31,6 +33,7 @@
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "workbox-window": "^7.4.1",
+    "zod": "^4.6.5",
     "zustand": "^5.0.15"
   },
   "devDependencies": {
@@ -43,6 +46,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^6.1.1",
+    "esbuild": "^0.28.2",
     "tailwindcss": "^4.3.3",
     "vite": "^8.3.1",
     "vite-plugin-pwa": "^1.3.0",

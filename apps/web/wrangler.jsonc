@@ -1,18 +1,49 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "prensa",
+  "account_id": "0fb5353f7d8afc6bd569381d97dad56a",
   "main": "./worker/index.ts",
   "compatibility_date": "2026-09-01",
   "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
   // La SPA se sirve como Static Assets desde el mismo Worker (un solo deploy).
   "assets": {
     "not_found_handling": "single-page-application",
     "binding": "ASSETS"
   },
   "observability": { "enabled": true },
+  // En desarrollo no se construye la imagen Docker: el SchedulerDO usa ENGINE_DEV_URL (.dev.vars)
+  // para hablar con un runner local (`pnpm dev:engine`).
+  "dev": { "enable_containers": false },
   "vars": {
     "APP_NAME": "Prensa",
-    "APP_VERSION": "0.1.0"
-  }
-  // Fase 3 (nube): r2_buckets, durable_objects (JobDO, SchedulerDO, QuotaDO), containers.
+    "APP_VERSION": "0.2.0",
+    // URL pública del Worker para los callbacks del contenedor. Vacío = usar el origen de la petición.
+    "WORKER_URL": "",
+    "MAX_RUNNING": "2",
+    "JOB_TTL_HOURS": "24",
+    "CLOUD_MAX_BYTES": "2147483648",
+    "QUOTA_JOBS_PER_DAY": "20",
+    "QUOTA_BYTES_PER_DAY": "5368709120"
+  },
+  "r2_buckets": [{ "binding": "FILES", "bucket_name": "prensa-files" }],
+  "durable_objects": {
+    "bindings": [
+      { "name": "JOBS", "class_name": "JobDO" },
+      { "name": "SCHEDULER", "class_name": "SchedulerDO" },
+      { "name": "QUOTA", "class_name": "QuotaDO" },
+      { "name": "ENGINE", "class_name": "EngineContainer" }
+    ]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["JobDO", "SchedulerDO", "QuotaDO", "EngineContainer"] }],
+  "containers": [
+    {
+      "class_name": "EngineContainer",
+      "image": "./container/Dockerfile",
+      "instance_type": "standard-3",
+      "max_instances": 2
+    }
+  ]
+  // Secretos (wrangler secret put): INTERNAL_SECRET (obligatorio), CLOUD_ACCESS_CODE (opcional).
+  // Desarrollo: .dev.vars con INTERNAL_SECRET y ENGINE_DEV_URL=http://127.0.0.1:8080
 }

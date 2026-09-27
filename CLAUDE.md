@@ -8,7 +8,8 @@ Compresor PDF profesional, local-first, con el sistema de diseño Polen. Plan co
 ```bash
 pnpm install            # deps (los builds de esbuild/workerd están permitidos en pnpm-workspace.yaml)
 pnpm ds:sync            # sincroniza Polen desde https://polen.cdc.cool/r → apps/web/src/components/ds
-pnpm dev                # Vite + Worker local (http://localhost:5173)
+pnpm dev                # Vite + Worker local (http://localhost:5173); miniflare simula R2 y Durable Objects
+pnpm --filter @prensa/web dev:engine   # runner del contenedor en local (:8080) para probar la nube sin Docker (.dev.vars → ENGINE_DEV_URL)
 pnpm test               # vitest en todos los workspaces (motor: PDFs sintéticos con MuPDF)
 pnpm test:e2e           # Playwright (genera fixtures con tsx; Chromium ya instalado con `playwright install chromium`)
 pnpm typecheck          # tsc por workspace (apps/web genera worker-configuration.d.ts con `pnpm -F @prensa/web cf:types`)
@@ -26,7 +27,11 @@ Un solo test: `pnpm --filter @prensa/engine exec vitest run test/engine.test.ts 
   (`src/worker`) y en Node (`src/node.ts`, usado por tests/bench/nube).
 - `apps/web` — Vite + React 19 + Tailwind 4 + Polen. `worker/` es el Cloudflare Worker (Hono) que sirve la
   SPA y la API. `src/components/ds/**` y `src/styles/tokens.css` son GENERADOS por `pnpm ds:sync`: no editar.
-- `apps/engine-cloud` — contenedor (Fase 3) con Ghostscript/ocrmypdf/jbig2enc.
+- `apps/web/container` — imagen del motor pesado (Node 24 + Ghostscript + mupdf-tools + qpdf + ocrmypdf + jbig2enc). El runner
+  (`container/src`) se empaqueta con esbuild en `pnpm build`; el Worker le habla vía `EngineContainer` (Durable Object).
+- `apps/web/worker` — API: `api/uploads` (R2 multipart), `api/jobs`, `api/internal` (callbacks del contenedor), DOs `do/job`,
+  `do/scheduler`, `do/quota`. Deploy con Workers Builds (Git) — ver `docs/DEPLOY.md`.
+- `apps/domain` — proyecto Cloudflare Pages que sirve `pdf.cdc.cool` y reenvía todo al Worker (service binding).
 - `tools/polen-sync.ts`, `tools/bench/`.
 
 ## Reglas del motor

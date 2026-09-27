@@ -10,6 +10,7 @@ import { cn } from "@/lib/cn";
 import { PRESET_META, formatPercent } from "./presets";
 import { useProfilesStore } from "./profiles";
 import { selectTotals, useCompressStore } from "./store";
+import { useCloudConfig } from "./useCloudConfig";
 
 const DPI_OPTIONS = [
   { value: "auto", label: "Según el preset" },
@@ -30,6 +31,11 @@ export function SettingsPanel() {
   const saveProfile = useProfilesStore((s) => s.save);
   const removeProfile = useProfilesStore((s) => s.remove);
   const [profileName, setProfileName] = useState("");
+  const cloudConfig = useCloudConfig();
+  const cloudAccessCode = useCompressStore((s) => s.cloudAccessCode);
+  const setCloudAccessCode = useCompressStore((s) => s.setCloudAccessCode);
+  const cloud = spec.cloud;
+  const setCloud = (patch: Partial<typeof cloud>) => setSpec((s) => ({ ...s, cloud: { ...s.cloud, ...patch } }));
 
   const estimateFor = (preset: PresetId) => selectTotals(files, preset);
   const anyReady = files.some((f) => f.report);
@@ -229,6 +235,100 @@ export function SettingsPanel() {
               value={spec.output.namePattern}
               onChange={(e) => setSpec((s) => ({ ...s, output: { ...s.output, namePattern: e.target.value || "{original}-comprimido" } }))}
             />
+          </div>
+        </AccordionItem>
+
+        <AccordionItem title={cloud.enabled ? "Nube · activa" : "Nube"}>
+          <div className="flex min-w-0 flex-col gap-3 pb-2 [&_*]:min-w-0">
+            {cloudConfig === null ? (
+              <p className="text-sm text-fg-muted">La nube no está disponible en este entorno.</p>
+            ) : (
+              <>
+                <Switch
+                  size="sm"
+                  label="Procesar en la nube (Cloudflare)"
+                  supporting={`OCR, JBIG2 y archivos enormes (hasta ${formatBytes(cloudConfig.maxBytes)}). Se sube cifrado, se procesa y se borra a las ${cloudConfig.ttlHours} h.`}
+                  checked={cloud.enabled}
+                  onCheckedChange={(checked) => setCloud({ enabled: checked })}
+                />
+                {cloud.enabled && (
+                  <>
+                    {cloudConfig.requiresAccessCode && (
+                      <Input
+                        size="sm"
+                        type="password"
+                        label="Código de acceso"
+                        hint="Esta nube es privada: pide el código a quien la administra"
+                        value={cloudAccessCode}
+                        onChange={(e) => setCloudAccessCode(e.target.value)}
+                      />
+                    )}
+                    <Select
+                      size="sm"
+                      label="Motor"
+                      value={cloud.engine}
+                      onValueChange={(v) => v && setCloud({ engine: v as typeof cloud.engine })}
+                      options={[
+                        { value: "auto", label: "Automático (conserva interactividad)" },
+                        { value: "ghostscript", label: "Ghostscript (aplana formularios)" },
+                        { value: "rasterize", label: "Rasterizar (página → imagen)" },
+                      ]}
+                    />
+                    <Switch
+                      size="sm"
+                      label="OCR: texto seleccionable"
+                      supporting="Tesseract 5 añade una capa de texto invisible"
+                      checked={cloud.ocr.enabled}
+                      onCheckedChange={(checked) => setCloud({ ocr: { ...cloud.ocr, enabled: checked } })}
+                    />
+                    {cloud.ocr.enabled && (
+                      <>
+                        <Select
+                          size="sm"
+                          multiple
+                          label="Idiomas del OCR"
+                          value={cloud.ocr.languages}
+                          onValueChange={(v) => setCloud({ ocr: { ...cloud.ocr, languages: v.length ? v : ["spa"] } })}
+                          options={cloudConfig.ocrLanguages.map((l) => ({ value: l.code, label: l.label }))}
+                        />
+                        <Select
+                          size="sm"
+                          label="Páginas"
+                          value={cloud.ocr.mode}
+                          onValueChange={(v) => v && setCloud({ ocr: { ...cloud.ocr, mode: v as typeof cloud.ocr.mode } })}
+                          options={[
+                            { value: "skip-text", label: "Solo las que no tienen texto" },
+                            { value: "force", label: "Todas (rehacer el texto existente)" },
+                          ]}
+                        />
+                        <Switch
+                          size="sm"
+                          label="Enderezar y rotar páginas escaneadas"
+                          checked={cloud.ocr.deskew}
+                          onCheckedChange={(checked) => setCloud({ ocr: { ...cloud.ocr, deskew: checked, rotate: checked } })}
+                        />
+                      </>
+                    )}
+                    <Switch
+                      size="sm"
+                      label="JBIG2 para escaneos en B/N"
+                      supporting="2–4× más pequeño que CCITT"
+                      checked={cloud.jbig2}
+                      onCheckedChange={(checked) => setCloud({ jbig2: checked })}
+                    />
+                    <Switch
+                      size="sm"
+                      label="Linealizar (vista web rápida)"
+                      checked={cloud.linearize}
+                      onCheckedChange={(checked) => setCloud({ linearize: checked })}
+                    />
+                    <p className="text-xs text-fg-muted">
+                      El resultado queda descargable 24 h y luego se borra; puedes eliminarlo antes desde la tarjeta.
+                    </p>
+                  </>
+                )}
+              </>
+            )}
           </div>
         </AccordionItem>
 

@@ -43,3 +43,6 @@ apps/web/src/routeTree.gen.ts
 
 # fixtures generados por Playwright (global-setup)
 apps/web/e2e/fixtures/
+
+# runner del contenedor empaquetado en el build
+apps/web/container/dist/

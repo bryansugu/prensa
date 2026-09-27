@@ -93,7 +93,8 @@ export function CompressPage() {
   }, [addFiles]);
 
   const totals = selectTotals(files, preset);
-  const compressing = files.some((f) => f.status === "compressing");
+  const cloudEnabled = useCompressStore((s) => s.spec.cloud.enabled);
+  const compressing = files.some((f) => f.status === "compressing" || f.status === "uploading" || f.status === "cloud");
   const canCompress = totals.ready > 0 && !compressing;
   const estimatedSavings = Math.max(0, 1 - totals.estimated / Math.max(1, totals.original));
 
@@ -144,7 +145,11 @@ export function CompressPage() {
       disabled={!canCompress}
       onClick={() => void compressAll()}
     >
-      {compressing ? "Comprimiendo…" : `Comprimir ${totals.ready} ${totals.ready === 1 ? "archivo" : "archivos"}`}
+      {compressing
+        ? cloudEnabled
+          ? "Procesando en la nube…"
+          : "Comprimiendo…"
+        : `${cloudEnabled ? "Comprimir en la nube" : "Comprimir"} ${totals.ready} ${totals.ready === 1 ? "archivo" : "archivos"}`}
     </Button>
   );
 

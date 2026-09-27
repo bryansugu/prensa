@@ -397,14 +397,82 @@ export const JobState = z.object({
   progress: z.number().min(0).max(1),
   message: z.string().nullable(),
   fileName: z.string(),
+  outputName: z.string().nullable(),
   inputSize: z.number().int(),
   result: CompressionResult.nullable(),
+  /** Ruta relativa de descarga firmada (válida hasta expiresAt) */
+  downloadUrl: z.string().nullable(),
   error: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
   expiresAt: z.string().nullable(),
 });
 export type JobState = z.infer<typeof JobState>;
+
+/** Configuración pública de la nube que la UI consulta al cargar. */
+export const CloudConfig = z.object({
+  enabled: z.boolean(),
+  maxBytes: z.number().int(),
+  partSize: z.number().int(),
+  requiresAccessCode: z.boolean(),
+  ocrLanguages: z.array(z.object({ code: z.string(), label: z.string() })),
+  ttlHours: z.number().int(),
+});
+export type CloudConfig = z.infer<typeof CloudConfig>;
+
+export const UploadInitRequest = z.object({
+  fileName: z.string().min(1).max(255),
+  size: z.number().int().positive(),
+  accessCode: z.string().max(128).optional(),
+});
+export type UploadInitRequest = z.infer<typeof UploadInitRequest>;
+
+export const UploadInitResponse = z.object({
+  uploadId: z.string(),
+  key: z.string(),
+  partSize: z.number().int(),
+});
+export type UploadInitResponse = z.infer<typeof UploadInitResponse>;
+
+export const UploadCompleteRequest = z.object({
+  key: z.string().min(1),
+  parts: z.array(z.object({ partNumber: z.number().int().positive(), etag: z.string() })).min(1),
+});
+export type UploadCompleteRequest = z.infer<typeof UploadCompleteRequest>;
+
+/** Payload que el Worker envía al contenedor para ejecutar un trabajo. */
+export const RunJobPayload = z.object({
+  jobId: z.string().uuid(),
+  /** URL base del Worker a la que el contenedor reporta y de la que lee/escribe objetos */
+  callbackUrl: z.string().url(),
+  inputKey: z.string(),
+  outputKey: z.string(),
+  fileName: z.string(),
+  inputSize: z.number().int(),
+  spec: CompressionSpec,
+});
+export type RunJobPayload = z.infer<typeof RunJobPayload>;
+
+export const JobProgressReport = z.object({
+  stage: Stage,
+  progress: z.number().min(0).max(1),
+  message: z.string().optional(),
+});
+export const JobDoneReport = z.object({
+  result: CompressionResult,
+  outputKey: z.string(),
+});
+export const JobFailedReport = z.object({ error: z.string().max(2000) });
+
+export const OCR_LANGUAGES = [
+  { code: "spa", label: "Español" },
+  { code: "eng", label: "Inglés" },
+  { code: "por", label: "Portugués" },
+  { code: "fra", label: "Francés" },
+  { code: "deu", label: "Alemán" },
+  { code: "ita", label: "Italiano" },
+  { code: "cat", label: "Catalán" },
+] as const;
 
 export const CreateJobRequest = z.object({
   uploadKey: z.string().min(1),

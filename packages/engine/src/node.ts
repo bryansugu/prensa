@@ -2,8 +2,10 @@
  * Adaptador Node (tests, benchmark, motor en la nube): inicializa los códecs
  * WASM desde disco y define ImageData, que no existe fuera del navegador.
  */
+import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
 import type { CompressionSpecInput } from "@prensa/schema";
 import { analyzeDocument, type AnalysisContext } from "./analyze";
 import { initCodecs } from "./codecs";
@@ -36,9 +38,14 @@ export function initNodeEngine(): Promise<Mu> {
       (globalThis as unknown as { ImageData: unknown }).ImageData = NodeImageData;
     }
     const require = createRequire(import.meta.url);
+    // En el contenedor el runner va empaquetado y los .wasm se copian al lado del bundle.
+    const locate = (sibling: string, pkgPath: string) => {
+      const local = fileURLToPath(new URL(`./${sibling}`, import.meta.url));
+      return existsSync(local) ? local : require.resolve(pkgPath);
+    };
     const [jpegWasm, resizeWasm] = await Promise.all([
-      readFile(require.resolve("@jsquash/jpeg/codec/enc/mozjpeg_enc.wasm")),
-      readFile(require.resolve("@jsquash/resize/lib/resize/pkg/squoosh_resize_bg.wasm")),
+      readFile(locate("mozjpeg_enc.wasm", "@jsquash/jpeg/codec/enc/mozjpeg_enc.wasm")),
+      readFile(locate("squoosh_resize_bg.wasm", "@jsquash/resize/lib/resize/pkg/squoosh_resize_bg.wasm")),
     ]);
     await initCodecs({ jpegEncoder: await WebAssembly.compile(jpegWasm), resize: resizeWasm });
     return loadMupdf();

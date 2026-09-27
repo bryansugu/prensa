@@ -131,3 +131,8 @@ export const Type = (p: SVGProps<SVGSVGElement>) => (
     <path d="M4 6V3.5h12V6M10 3.5v13M7.5 16.5h5" />
   </Icon>
 );
+export const Cloud = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <path d="M6 16.5A4 4 0 0 1 5.5 8.55a5 5 0 0 1 9.6 1.2A3.5 3.5 0 0 1 15 16.5H6Z" />
+  </Icon>
+);

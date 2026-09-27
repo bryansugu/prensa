@@ -1,6 +1,6 @@
 import { formatBytes } from "@prensa/schema";
 import { useState } from "react";
-import { Download, FileText, Refresh, Scan, Trash } from "@/components/app/icons";
+import { Cloud, Download, FileText, Refresh, Scan, Trash } from "@/components/app/icons";
 import { Alert } from "@/components/ds/alert";
 import { Badge } from "@/components/ds/badge";
 import { Button } from "@/components/ds/button";
@@ -20,12 +20,16 @@ export function FileCard({ entry }: { entry: FileEntry }) {
   const compressOne = useCompressStore((s) => s.compressOne);
   const unlock = useCompressStore((s) => s.unlock);
   const cancel = useCompressStore((s) => s.cancel);
+  const deleteFromCloud = useCompressStore((s) => s.deleteFromCloud);
+  const cloudEnabled = useCompressStore((s) => s.spec.cloud.enabled);
   const [password, setPassword] = useState("");
   const [compareOpen, setCompareOpen] = useState(false);
 
   const report = entry.report;
   const estimate = report?.estimates[preset];
-  const busy = entry.status === "opening" || entry.status === "analyzing" || entry.status === "compressing";
+  const busy = entry.status === "opening" || entry.status === "analyzing" || entry.status === "compressing" || entry.status === "uploading" || entry.status === "cloud";
+  const isCloudResult = entry.status === "done" && entry.cloud != null;
+  const expired = entry.cloud?.status === "expired";
 
   return (
     <article
@@ -134,6 +138,32 @@ export function FileCard({ entry }: { entry: FileEntry }) {
                 {report.warnings[0]}
               </Alert>
             )}
+            {report.docType === "scanned" && !cloudEnabled && (
+              <p className="text-sm text-fg-muted">
+                Escaneado sin texto: en <span className="font-medium text-fg">Ajustes → Nube</span> puedes añadir OCR y JBIG2.
+              </p>
+            )}
+          </div>
+        )}
+
+        {(entry.status === "uploading" || entry.status === "cloud") && entry.progress && (
+          <div className="flex items-end gap-3">
+            <div className="min-w-0 flex-1">
+              <Progress
+                value={entry.status === "cloud" && entry.progress.stage === "queued" ? null : Math.round(entry.progress.progress * 100)}
+                size="sm"
+                showValue={entry.progress.stage !== "queued"}
+                label={
+                  <span className="inline-flex items-center gap-1.5">
+                    <Cloud className="size-4 text-icon-muted" />
+                    {entry.progress.message && entry.progress.stage !== "upload" ? entry.progress.message : STAGE_LABEL[entry.progress.stage]}
+                  </span>
+                }
+              />
+            </div>
+            <Button variant="stroke" size="sm" radius="semi" onClick={() => cancel(entry.id)}>
+              Cancelar
+            </Button>
           </div>
         )}
 
@@ -198,18 +228,32 @@ export function FileCard({ entry }: { entry: FileEntry }) {
                 size="sm"
                 radius="semi"
                 iconLeft={<Download />}
+                disabled={!entry.outputUrl || expired}
                 onClick={() => entry.outputUrl && downloadUrl(entry.outputUrl, entry.outputName ?? entry.name)}
               >
-                Descargar
+                {expired ? "Archivo eliminado" : "Descargar"}
               </Button>
-              <Button variant="stroke" size="sm" radius="semi" iconLeft={<Scan />} onClick={() => setCompareOpen(true)}>
-                Comparar
-              </Button>
+              {!isCloudResult && (
+                <Button variant="stroke" size="sm" radius="semi" iconLeft={<Scan />} onClick={() => setCompareOpen(true)}>
+                  Comparar
+                </Button>
+              )}
+              {isCloudResult && !expired && (
+                <Button variant="stroke" size="sm" radius="semi" iconLeft={<Trash />} onClick={() => void deleteFromCloud(entry.id)}>
+                  Eliminar de la nube
+                </Button>
+              )}
               <Button variant="text" size="sm" radius="semi" iconLeft={<Refresh />} onClick={() => void compressOne(entry.id)}>
                 Recomprimir
               </Button>
             </div>
-            {compareOpen && <CompareViewer entry={entry} open={compareOpen} onOpenChange={setCompareOpen} />}
+            {isCloudResult && entry.cloud?.expiresAt && !expired && (
+              <p className="inline-flex items-center gap-1.5 text-xs text-fg-subtle">
+                <Cloud className="size-3.5" />
+                Procesado en la nube · disponible hasta {new Date(entry.cloud.expiresAt).toLocaleString("es")}
+              </p>
+            )}
+            {compareOpen && !isCloudResult && <CompareViewer entry={entry} open={compareOpen} onOpenChange={setCompareOpen} />}
           </div>
         )}
 

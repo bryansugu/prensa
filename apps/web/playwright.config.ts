@@ -23,5 +23,7 @@ export default defineConfig({
     url: `http://127.0.0.1:${PORT}/api/health`,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
+    // vite + workerd no siempre salen con SIGTERM: forzar cierre para que Playwright termine.
+    gracefulShutdown: { signal: "SIGTERM", timeout: 3000 },
   },
 });
