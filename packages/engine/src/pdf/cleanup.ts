@@ -56,7 +56,8 @@ export function applyCleanup(doc: PDFDocument, spec: CompressionSpec, features: 
   // lo cuelgan de cada Form XObject (con streams AIPrivateData de decenas de
   // KB) y pdfTeX añade PTEX.* a cada figura incluida. Se recorren todos los
   // objetos; lo que quede sin referenciar lo elimina garbage=deduplicate.
-  const sweep = sweepObjects(doc, remove.pieceInfo);
+  const sweep = sweepObjects(doc, remove.pieceInfo, remove.metadata !== "keep");
+  if (sweep.metadataRemoved > 0) notes.push(`${sweep.metadataRemoved} bloques XMP de imágenes y objetos eliminados`);
   if (remove.pieceInfo && (sweep.privateRemoved > 0 || has(root, "PieceInfo"))) {
     safeDelete(root, "PieceInfo");
     notes.push(
@@ -227,16 +228,19 @@ const PRIVATE_KEYS = ["PieceInfo", "PTEX.FileName", "PTEX.InfoDict", "PTEX.PageN
 
 interface SweepResult {
   privateRemoved: number;
+  metadataRemoved: number;
 }
 
 /**
  * Una pasada por todos los objetos del documento: borra claves privadas de
  * cualquier diccionario (incluidos los de streams, siempre a través de la
- * referencia indirecta, nunca resolviéndolos).
+ * referencia indirecta, nunca resolviéndolos) y, si se pide, los bloques XMP
+ * que Photoshop/InDesign cuelgan de cada imagen (`/Metadata`), que pueden
+ * pesar más que el texto del documento. El XMP del catálogo se trata aparte.
  */
-function sweepObjects(doc: PDFDocument, removePrivate: boolean): SweepResult {
-  const result: SweepResult = { privateRemoved: 0 };
-  if (!removePrivate) return result;
+function sweepObjects(doc: PDFDocument, removePrivate: boolean, removeMetadata: boolean): SweepResult {
+  const result: SweepResult = { privateRemoved: 0, metadataRemoved: 0 };
+  if (!removePrivate && !removeMetadata) return result;
   let count: number;
   try {
     count = doc.countObjects();
@@ -251,6 +255,11 @@ function sweepObjects(doc: PDFDocument, removePrivate: boolean): SweepResult {
     } catch {
       continue;
     }
+    if (removeMetadata && asName(get(ref, "Type")) !== "Catalog" && has(ref, "Metadata")) {
+      safeDelete(ref, "Metadata");
+      result.metadataRemoved++;
+    }
+    if (!removePrivate) continue;
     let removed = false;
     for (const key of PRIVATE_KEYS) {
       if (has(ref, key)) {

@@ -15,8 +15,8 @@ File → Web Worker (packages/engine/src/worker/engine.worker.ts, Comlink)
                  3. images/process.ts por imagen (in-place, ver abajo)
                  4. pdf/cleanup.ts (conservar / eliminar) + barrido de TODOS los objetos:
                     /PieceInfo, PTEX.*, LastModified fuera (Illustrator/pdfTeX cuelgan KBs de cada figura)
-                 5. saveToBuffer("garbage=deduplicate,compress,compress-fonts,compress-images,objstms[,sanitize],encrypt=…")
-                    — se guarda con y sin `sanitize` (≤ 64 MB) y gana el más pequeño
+                 5. saveToBuffer("garbage=deduplicate,compress,compress-fonts,compress-images,objstms,encrypt=…")
+                    — sin `sanitize`: reescribe content streams y altera el texto extraíble en PDFs de InDesign
                  6. subsetFonts() en copia, aceptado solo si el texto extraído es idéntico
                  7. pdf/verify.ts: páginas, texto, SSIM de página, anotaciones/formularios/marcadores
                  8. si falla la verificación o no ahorra → se devuelve el original con explicación
@@ -53,6 +53,10 @@ contenedor salta el análisis WASM y usa Ghostscript nativo directamente (`NATIV
   devuelve la referencia para streams; `get()`/`isStream()`/`read*Stream()`/`write*Stream()` resuelven solos.
 - `isStream()`, `writeRawStream()`, `put()` van sobre la referencia indirecta.
 - Opciones de guardado no soportadas por el build WASM: `compress-effort`, `linearize`.
+- `sanitize` está prohibido: en un catálogo real de InDesign duplicaba caracteres en el texto extraído de
+  35/44 páginas (la verificación fallaba y se devolvía el original). Ahorraba unos KB como mucho.
+- El barrido de objetos (`pdf/cleanup.ts`) quita `/PieceInfo`, `PTEX.*` y los bloques `/Metadata` (XMP) de
+  imágenes: Photoshop/InDesign cuelgan uno por imagen y pueden ser el 12 % del archivo.
 
 ## Unir (compositor de páginas)
 

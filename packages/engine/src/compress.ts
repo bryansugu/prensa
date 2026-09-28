@@ -166,21 +166,9 @@ export async function compressPdf(
     // ── Guardar ────────────────────────────────────────────────────
     emit("save", 0.84, { message: "Guardando" });
     const keepEncryption = analysis.report.features.encrypted && spec.preserve.encryption;
-    let saveOpts = buildSaveOptions(opts.compressEffort ?? 80, keepEncryption, true);
+    const saveOpts = buildSaveOptions(opts.compressEffort ?? 80, keepEncryption);
     let bytes = saveDoc(doc, saveOpts);
     throwIfAborted(opts.signal);
-    if (input.length <= SANITIZE_COMPARE_MAX_BYTES) {
-      // "sanitize" reescribe los content streams: a veces poda recursos sin
-      // usar (gana), a veces los reformatea más largos (pierde). Se prueban
-      // ambos y se queda el más pequeño; cuesta un guardado extra.
-      const plainOpts = buildSaveOptions(opts.compressEffort ?? 80, keepEncryption, false);
-      const plain = saveDoc(doc, plainOpts);
-      if (plain.length < bytes.length) {
-        bytes = plain;
-        saveOpts = plainOpts;
-      }
-      throwIfAborted(opts.signal);
-    }
 
     // ── Subset de fuentes (experimental en MuPDF): en copia y verificado ──
     let fontsSubset = false;
@@ -267,18 +255,18 @@ export async function compressPdf(
   }
 }
 
-/** Por encima de este tamaño no se hace el segundo guardado comparativo. */
-const SANITIZE_COMPARE_MAX_BYTES = 64 * 1024 * 1024;
-
-export function buildSaveOptions(_effort: number, keepEncryption: boolean, sanitize = true): string {
-  // Nota: `compress-effort` existe en mutool pero el build WASM 1.28.1 lo rechaza ("Unused pdf arguments").
+export function buildSaveOptions(_effort: number, keepEncryption: boolean): string {
+  // Notas: `compress-effort` existe en mutool pero el build WASM 1.28.1 lo rechaza
+  // ("Unused pdf arguments"). `sanitize` NO se usa: reescribe los content streams y
+  // en PDFs de InDesign cambia el texto extraíble (duplica caracteres en 35/44
+  // páginas de un catálogo real), lo que hacía fallar la verificación y devolver
+  // el original. Ahorraba como mucho unos KB.
   const parts = [
     "garbage=deduplicate",
     "compress",
     "compress-fonts",
     "compress-images",
     "objstms",
-    ...(sanitize ? ["sanitize"] : []),
     keepEncryption ? "encrypt=keep" : "encrypt=none",
   ];
   return parts.join(",");

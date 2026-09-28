@@ -22,6 +22,7 @@ Fecha: 2026-09-28 · motor local `packages/engine` (MuPDF.js 1.28.1 + mozjpeg) �
 | attention.pdf (paper LaTeX, figuras Illustrator, enlaces + marcadores, 15 págs) | texto | 2,11 MB | **1,28 MB (−39,5 %)** | 1,28 MB (−39,6 %) | 1,26 MB (−40,5 %) | 1,37 MB (−36 %) | 1,23 MB (−42 %) |
 | gpt3-paper.pdf (paper, 75 págs, 74 imágenes) | mixto | 6,45 MB | **1,79 MB (−72,3 %)** | 1,79 MB (−72,3 %) | 1,16 MB (−82,0 %) | 1,25 MB (−81 %) | 1,52 MB (−76 %) |
 | f1040-formulario.pdf (AcroForm + XFA del IRS, 2 págs) | formulario | 215 KB | **137 KB (−36,3 %)** | 137 KB (−36,3 %) | 137 KB (−36,3 %) | 164 KB (−24 %) | 64 KB (−70 %, pierde el formulario) |
+| catálogo InDesign (44 págs, 221 imágenes ICC + 153 máscaras suaves, enlaces) | presentación | 20,4 MB | **5,35 MB (−73,8 %)** | 7,19 MB (−64,8 %) | 3,55 MB (−82,6 %) | 6,8 MB (−67 %; Smallpdf igual) | 7,04 MB (−66 %) |
 
 SSIM de página ≥ 0,994 en todas las filas de Prensa; texto idéntico; enlaces, marcadores y campos de
 formulario conservados; `qpdf --check` limpio.
@@ -37,6 +38,17 @@ formulario conservados; `qpdf --check` limpio.
 El SSIM de página del escaneo sintético es poco fiable (el ruido por píxel del fixture no sobrevive a ningún
 remuestreo); el SSIM por imagen que usa el motor sí lo es. Falta un escaneo real en el corpus.
 
+## Caso real: catálogo de 20 MB que "no bajaba"
+
+El usuario reportó que Prensa no hacía nada con un catálogo de 21 MB que iLovePDF y Smallpdf dejaban en
+6,8 MB. Diagnóstico con `tools/bench/diagnose.ts`: el motor sí recomprimía 218 imágenes (−12 MB), pero la
+verificación de texto fallaba y, por la regla de seguridad, se devolvía el original. La causa era la opción
+`sanitize` del guardado de MuPDF: reescribe los content streams y en este PDF de InDesign duplicaba
+caracteres en el texto extraído de 35 de 44 páginas. `sanitize` se eliminó (ahorraba unos KB como mucho).
+Además, el archivo llevaba 312 bloques XMP colgados de las imágenes (2,4 MB, 12 %): el barrido de objetos
+ahora los quita. Resultado: 5,35 MB en Inteligente (frente a 6,8 MB de la competencia), texto idéntico,
+enlaces intactos, `qpdf --check` limpio y las 44 páginas renderizan.
+
 ## Qué cambió en esta ronda (y por qué)
 
 1. **Barrido de datos privados en todos los objetos.** `attention.pdf` traía 58 streams `AIPrivateData` de
@@ -45,8 +57,8 @@ remuestreo); el SSIM por imagen que usa el motor sí lo es. Falta un escaneo rea
 2. **XFA duplicado en formularios híbridos.** El f1040 lleva 11 paquetes XFA (60 KB) que repiten el AcroForm.
    Se eliminan solo si hay AcroForm con campos y no es XFA dinámico (`NeedsRendering`): 199 KB → **137 KB**
    con el formulario funcionando. Opción `Eliminar → Datos XFA duplicados`, activada por defecto.
-3. **Guardar con y sin `sanitize`.** MuPDF reescribe los content streams con `sanitize`; en gpt3-paper los
-   agrandaba 22 KB, en otros poda recursos. Se guardan ambas variantes (≤ 64 MB) y gana la más pequeña.
+3. **Sin `sanitize`.** MuPDF reescribe los content streams con `sanitize`; en gpt3-paper los agrandaba
+   22 KB y en el catálogo real alteraba el texto extraíble. Se quitó del guardado.
 4. **B/N automático bajo garantía SSIM.** El candidato bilevel (Sauvola) ya no se acepta solo por ser el más
    pequeño: debe superar el SSIM mínimo del preset frente al original, como el JPEG.
 5. **Inteligente en escaneos: 150 dpi / q70** (antes 200 dpi): mismo SSIM de página (0,993) y 25 % menos.
