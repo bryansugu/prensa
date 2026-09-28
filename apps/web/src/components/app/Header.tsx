@@ -5,7 +5,7 @@ import { ThemeToggle } from "./ThemeToggle";
 
 const TOOLS = [
   { to: "/", label: "Comprimir", ready: true },
-  { to: "/", label: "Unir", ready: false },
+  { to: "/unir", label: "Unir", ready: true },
   { to: "/", label: "Dividir", ready: false },
 ] as const;
 

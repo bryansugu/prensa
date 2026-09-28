@@ -1,8 +1,22 @@
 # Herramientas (tool modules) — cómo añadir la siguiente
 
-Prensa v1 tiene una sola herramienta (Comprimir), pero el código está partido para que la
-segunda (Unir, Dividir, Rotar, OCR…) sea una carpeta nueva y no una reescritura. Este documento
-fija el contrato.
+Prensa tiene dos herramientas: **Comprimir** (`features/compress`) y **Unir** (`features/merge`, un
+compositor de páginas: cada documento se abre con miniaturas y el resultado se arma página a página con
+arrastrar y soltar o con selección + «insertar aquí»). Este documento fija el contrato para las siguientes
+(Dividir, Rotar, OCR…).
+
+## Unir, en concreto
+
+- Motor: `packages/engine/src/compose.ts` → `composeDocument(mupdf, sources, spec)`. Copia páginas entre
+  documentos abiertos con `newGraftMap().graftPage()` (un map por origen: fuentes e imágenes compartidas se
+  copian una vez), aplica `/Rotate`, crea un marcador por documento (`outlineIterator().insert`) y verifica
+  páginas y texto de muestra. Los enlaces internos entre páginas del origen no se conservan todavía.
+- Worker: `compose(jobId, spec, onProgress)`; todos los orígenes deben estar abiertos en el **mismo** worker,
+  por eso `features/merge/engine.ts` usa un worker propio en vez del pool del compresor.
+- UI: `store.ts` (orígenes con miniaturas, secuencia, selección, trabajo), `SourceStrip` (páginas
+  arrastrables + casilla), `OutputBoard` (`@dnd-kit/sortable`, gaps «+» para insertar la selección),
+  `MergeBar` (opciones: nombre, marcadores, comprimir al terminar). Accesible: la selección + «insertar aquí»
+  es la ruta de teclado; el tablero se reordena con espacio y flechas.
 
 ## Anatomía de una herramienta
 
@@ -24,7 +38,8 @@ gestiona memoria, cancelación por `AbortController` y progreso (`ProgressEvent`
 
 | Pieza | Dónde | Uso |
 |---|---|---|
-| Dropzone, FileCard, CompareViewer, HistoryList | `features/compress/` → mover a `components/app/` al crear la 2.ª herramienta | entrada de archivos, tarjetas, comparador antes/después, historial |
+| Dropzone (`components/app/Dropzone.tsx`), `lib/download.ts` | compartidos ya | entrada de archivos (props `hint`, `badge`), descarga y ZIP |
+| FileCard, CompareViewer, HistoryList | `features/compress/` | tarjetas, comparador antes/después, historial (aún específicos del compresor) |
 | `EnginePool` | `features/compress/engine-pool.ts` | hasta 3 workers; un archivo vive en un worker; `direct()` para llamadas fuera del pool |
 | Perfiles e historial | `profiles.ts`, `history.ts` | localStorage / IndexedDB; parametrizar por `toolId` |
 | Descarga y ZIP | `download.ts` | `fflate` para lotes |
@@ -43,6 +58,7 @@ gestiona memoria, cancelación por `AbortController` y progreso (`ProgressEvent`
    herramienta aporta solo `run(entry, spec)`.
 4. **Header**: `TOOLS` pasa de constante a registro (`tools/registry.ts`) con `{ id, to, label, icon, ready, description }`
    para generar también la portada del hub.
+5. **Historial**: Unir no guarda historial todavía (los PDF unidos viven solo en memoria hasta descargarlos).
 
 ## Checklist para una herramienta nueva
 

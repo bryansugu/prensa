@@ -490,6 +490,39 @@ export const CreateJobRequest = z.object({
 });
 export type CreateJobRequest = z.infer<typeof CreateJobRequest>;
 
+// ───────────────────────────── Unir / componer páginas ─────────────────────────────
+
+export const Rotation = z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]);
+export type Rotation = z.infer<typeof Rotation>;
+
+/** Una página del resultado: de qué documento (id abierto en el worker), qué página y giro extra. */
+export const ComposePageRef = z.object({
+  source: z.string().min(1),
+  page: z.number().int().min(0),
+  rotate: Rotation.default(0),
+});
+export type ComposePageRef = z.infer<typeof ComposePageRef>;
+
+export const ComposeSpec = z.object({
+  pages: z.array(ComposePageRef).min(1).max(10_000),
+  /** Un marcador por documento de origen, en su primera aparición (solo si hay ≥ 2 documentos). */
+  bookmarks: z.boolean().default(true),
+  title: z.string().max(300).optional(),
+});
+export type ComposeSpec = z.infer<typeof ComposeSpec>;
+export type ComposeSpecInput = z.input<typeof ComposeSpec>;
+
+export const ComposeResult = z.object({
+  pageCount: z.number().int(),
+  sources: z.number().int(),
+  outputSize: z.number().int(),
+  durationMs: z.number().int(),
+  bookmarks: z.number().int(),
+  verification: z.object({ pagesOk: z.boolean(), textOk: z.boolean() }),
+  notes: z.array(z.string()),
+});
+export type ComposeResult = z.infer<typeof ComposeResult>;
+
 // ───────────────────────────── Utilidades ─────────────────────────────
 
 export function outputFileName(pattern: string, originalName: string): string {

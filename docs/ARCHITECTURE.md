@@ -54,6 +54,13 @@ contenedor salta el análisis WASM y usa Ghostscript nativo directamente (`NATIV
 - `isStream()`, `writeRawStream()`, `put()` van sobre la referencia indirecta.
 - Opciones de guardado no soportadas por el build WASM: `compress-effort`, `linearize`.
 
+## Unir (compositor de páginas)
+
+`compose.ts` construye un `PDFDocument` vacío y copia páginas de los orígenes con un `PDFGraftMap` por
+documento (recursos compartidos una sola vez; la misma página puede repetirse), aplica `/Rotate`, añade un
+marcador por documento y verifica páginas + texto de muestra. La UI (`features/merge`) abre todos los
+orígenes en un worker propio, renderiza miniaturas por lotes y arma la secuencia con `@dnd-kit`.
+
 ## Datos compartidos
 
 `packages/schema` (zod): `CompressionSpec` (preset + overrides + conservar/eliminar/aplanar + nube + salida),

@@ -5,6 +5,10 @@ import { cn } from "@/lib/cn";
 
 interface DropzoneProps {
   compact?: boolean;
+  /** Texto bajo el título (por defecto el del compresor). */
+  hint?: string;
+  /** Sello inferior (solo en el modo grande). */
+  badge?: string | null;
   onFiles: (files: File[]) => void;
 }
 
@@ -12,7 +16,12 @@ function filesFromDataTransfer(dt: DataTransfer): File[] {
   return Array.from(dt.files);
 }
 
-export function Dropzone({ compact = false, onFiles }: DropzoneProps) {
+export function Dropzone({
+  compact = false,
+  hint = "o haz clic para elegirlos · hasta 50 archivos · también puedes pegarlos",
+  badge = "Se procesa en tu dispositivo · nada se sube a internet",
+  onFiles,
+}: DropzoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const inputId = useId();
@@ -76,13 +85,13 @@ export function Dropzone({ compact = false, onFiles }: DropzoneProps) {
           {dragging ? "Suelta para agregar" : compact ? "Agregar más PDF" : "Arrastra tus PDF aquí"}
         </p>
         <p id={`${inputId}-hint`} className={cn("text-fg-muted", compact ? "text-sm" : "text-md")}>
-          o haz clic para elegirlos · hasta 50 archivos · también puedes pegarlos
+          {hint}
         </p>
       </div>
-      {!compact && (
+      {!compact && badge && (
         <p className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-primary-border bg-primary-faint px-3 py-1 text-sm font-medium text-primary-text">
           <Shield className="size-4" />
-          Se procesa en tu dispositivo · nada se sube a internet
+          {badge}
         </p>
       )}
     </div>

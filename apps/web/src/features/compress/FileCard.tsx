@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ds/skeleton";
 import { Tooltip } from "@/components/ds/tooltip";
 import { BreakdownBar } from "./BreakdownBar";
 import { CompareViewer } from "./CompareViewer";
-import { downloadUrl } from "./download";
+import { downloadUrl } from "@/lib/download";
 import { DOC_TYPE_LABEL, FEATURE_FLAGS, STAGE_LABEL, formatPercent } from "./presets";
 import { LOCAL_SOFT_LIMIT, useCompressStore, type FileEntry } from "./store";
 

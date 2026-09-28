@@ -4,9 +4,10 @@
  * comprimir sin re-parsear.
  */
 import * as Comlink from "comlink";
-import type { AnalysisReport, CompressionResult, CompressionSpecInput, ProgressEvent } from "@prensa/schema";
+import type { AnalysisReport, ComposeResult, ComposeSpecInput, CompressionResult, CompressionSpecInput, ProgressEvent } from "@prensa/schema";
 import { analyzeDocument } from "../analyze";
 import { initCodecs } from "../codecs";
+import { composeDocument, type ComposeSource } from "../compose";
 import { openDocument, PasswordRequiredError } from "../compress";
 import { compressToTarget } from "../target";
 import { loadMupdf, type Mu, type PDFDocument } from "../mupdf";
@@ -31,6 +32,11 @@ export interface RenderResult {
 export interface CompressResult {
   bytes: Uint8Array;
   result: CompressionResult;
+}
+
+export interface ComposeWorkerResult {
+  bytes: Uint8Array;
+  result: ComposeResult;
 }
 
 class EngineWorker {
@@ -99,7 +105,39 @@ class EngineWorker {
     }
   }
 
-  /** Cancela una compresión en curso (se aplica entre imágenes/etapas). */
+  /**
+   * Une/compone páginas de documentos ya abiertos en este worker (ver
+   * compose.ts). `jobId` sirve para cancelar con cancel(jobId).
+   */
+  async compose(
+    jobId: string,
+    spec: ComposeSpecInput,
+    onProgress?: (done: number, total: number) => void,
+  ): Promise<ComposeWorkerResult> {
+    const mu = await this.mupdf();
+    const sources = new Map<string, ComposeSource>();
+    for (const ref of spec.pages) {
+      if (sources.has(ref.source)) continue;
+      const entry = this.must(ref.source);
+      sources.set(ref.source, { name: entry.name, doc: entry.doc });
+    }
+    const controller = new AbortController();
+    this.aborts.set(jobId, controller);
+    try {
+      const out = await composeDocument(mu, sources, spec, {
+        signal: controller.signal,
+        onProgress: onProgress ? (d, t) => void onProgress(d, t) : undefined,
+      });
+      return Comlink.transfer({ bytes: out.bytes, result: out.result }, [out.bytes.buffer as ArrayBuffer]);
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") throw new Error("CANCELLED", { cause: err });
+      throw err;
+    } finally {
+      this.aborts.delete(jobId);
+    }
+  }
+
+  /** Cancela una compresión o composición en curso (se aplica entre etapas). */
   cancel(id: string): boolean {
     const c = this.aborts.get(id);
     if (!c) return false;

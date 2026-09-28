@@ -136,3 +136,27 @@ export const Cloud = (p: SVGProps<SVGSVGElement>) => (
     <path d="M6 16.5A4 4 0 0 1 5.5 8.55a5 5 0 0 1 9.6 1.2A3.5 3.5 0 0 1 15 16.5H6Z" />
   </Icon>
 );
+export const RotateCw = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <path d="M16.5 8.5A6.5 6.5 0 1 0 15 14.6" />
+    <path d="M16.5 4v4.5H12" />
+  </Icon>
+);
+export const Copy = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <rect x="7.5" y="7.5" width="9" height="9" rx="1.5" />
+    <path d="M12.5 7.5V5A1.5 1.5 0 0 0 11 3.5H5A1.5 1.5 0 0 0 3.5 5v6A1.5 1.5 0 0 0 5 12.5h2.5" />
+  </Icon>
+);
+export const Merge = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <path d="M4 4.5h4.5L12 10l-3.5 5.5H4" />
+    <path d="M12 10h4.5M14.5 7.5 17 10l-2.5 2.5" />
+  </Icon>
+);
+export const Pages = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <path d="M6.5 3.5h5l3 3v8a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-10a1 1 0 0 1 1-1Z" />
+    <path d="M11.5 3.5v3h3M3.5 7v9.5a1 1 0 0 0 1 1H12" />
+  </Icon>
+);

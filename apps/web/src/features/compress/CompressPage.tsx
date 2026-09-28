@@ -7,7 +7,7 @@ import { Switch } from "@/components/ds/switch";
 import { useToast } from "@/components/ds/toast";
 import { BRAND } from "@/lib/brand";
 import { useMediaQuery } from "@/lib/useMediaQuery";
-import { Dropzone } from "./Dropzone";
+import { Dropzone } from "@/components/app/Dropzone";
 import { pool } from "./engine-pool";
 import { FileCard } from "./FileCard";
 import { HistoryList } from "./HistoryList";

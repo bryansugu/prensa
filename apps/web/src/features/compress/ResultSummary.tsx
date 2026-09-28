@@ -2,7 +2,7 @@ import { formatBytes } from "@prensa/schema";
 import { useState } from "react";
 import { Archive } from "@/components/app/icons";
 import { Button } from "@/components/ds/button";
-import { downloadBlob, zipFiles } from "./download";
+import { downloadBlob, zipFiles } from "@/lib/download";
 import { formatPercent } from "./presets";
 import { selectTotals, useCompressStore } from "./store";
 

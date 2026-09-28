@@ -8,6 +8,7 @@ export {
   type CompressOptions,
   type CompressOutput,
 } from "./compress";
+export { composeDocument, type ComposeOptions, type ComposeOutput, type ComposeSource } from "./compose";
 export { estimateAll, estimateImage } from "./estimate";
 export { smartParams } from "./smart";
 export { compressToTarget } from "./target";
