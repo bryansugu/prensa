@@ -9,7 +9,8 @@ import { fileURLToPath } from "node:url";
 import type { CompressionSpecInput } from "@prensa/schema";
 import { analyzeDocument, type AnalysisContext } from "./analyze";
 import { initCodecs } from "./codecs";
-import { compressPdf, openDocument, type CompressOptions, type CompressOutput } from "./compress";
+import { openDocument, type CompressOptions, type CompressOutput } from "./compress";
+import { compressToTarget } from "./target";
 import { loadMupdf, type Mu } from "./mupdf";
 
 class NodeImageData {
@@ -69,7 +70,7 @@ export async function compressBytes(
   opts: Omit<CompressOptions, "fileName"> & { fileName?: string },
 ): Promise<CompressOutput> {
   const mupdf = await initNodeEngine();
-  return compressPdf(mupdf, bytes, spec, { ...opts, fileName: opts.fileName ?? "documento.pdf" });
+  return compressToTarget(mupdf, bytes, spec, { ...opts, fileName: opts.fileName ?? "documento.pdf" });
 }
 
 export async function analyzeFile(path: string, password?: string): Promise<AnalysisContext> {

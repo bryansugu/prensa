@@ -7,7 +7,8 @@ import * as Comlink from "comlink";
 import type { AnalysisReport, CompressionResult, CompressionSpecInput, ProgressEvent } from "@prensa/schema";
 import { analyzeDocument } from "../analyze";
 import { initCodecs } from "../codecs";
-import { compressPdf, openDocument, PasswordRequiredError } from "../compress";
+import { openDocument, PasswordRequiredError } from "../compress";
+import { compressToTarget } from "../target";
 import { loadMupdf, type Mu, type PDFDocument } from "../mupdf";
 
 interface OpenDoc {
@@ -81,7 +82,7 @@ class EngineWorker {
     const controller = new AbortController();
     this.aborts.set(id, controller);
     try {
-      const out = await compressPdf(mu, entry.bytes, { ...spec, password: entry.password }, {
+      const out = await compressToTarget(mu, entry.bytes, { ...spec, password: entry.password }, {
         fileName: entry.name,
         signal: controller.signal,
         onProgress: onProgress ? (e) => void onProgress(e) : undefined,

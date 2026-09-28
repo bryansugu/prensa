@@ -12,7 +12,7 @@ import { BreakdownBar } from "./BreakdownBar";
 import { CompareViewer } from "./CompareViewer";
 import { downloadUrl } from "./download";
 import { DOC_TYPE_LABEL, FEATURE_FLAGS, STAGE_LABEL, formatPercent } from "./presets";
-import { useCompressStore, type FileEntry } from "./store";
+import { LOCAL_SOFT_LIMIT, useCompressStore, type FileEntry } from "./store";
 
 export function FileCard({ entry }: { entry: FileEntry }) {
   const preset = useCompressStore((s) => s.spec.preset);
@@ -22,6 +22,8 @@ export function FileCard({ entry }: { entry: FileEntry }) {
   const cancel = useCompressStore((s) => s.cancel);
   const deleteFromCloud = useCompressStore((s) => s.deleteFromCloud);
   const cloudEnabled = useCompressStore((s) => s.spec.cloud.enabled);
+  const setForceCloud = useCompressStore((s) => s.setForceCloud);
+  const processInCloud = useCompressStore((s) => s.processInCloud);
   const [password, setPassword] = useState("");
   const [compareOpen, setCompareOpen] = useState(false);
 
@@ -118,8 +120,49 @@ export function FileCard({ entry }: { entry: FileEntry }) {
           </form>
         )}
 
+        {entry.status === "ready" && entry.tooLargeForLocal && (
+          <Alert
+            color="warning"
+            size="sm"
+            role="none"
+            title="Demasiado grande para el navegador"
+            action={
+              <Button
+                variant="tonal"
+                size="sm"
+                radius="semi"
+                onClick={() => {
+                  setForceCloud(entry.id, true);
+                  void processInCloud(entry.id);
+                }}
+              >
+                Procesar en la nube
+              </Button>
+            }
+          >
+            Más de 400 MB no caben en la memoria del navegador. En la nube se procesa hasta 2 GB; el archivo se sube cifrado y se borra a las 24 h.
+          </Alert>
+        )}
+
         {entry.status === "ready" && report && (
           <div className="flex flex-col gap-2">
+            {entry.size > LOCAL_SOFT_LIMIT && !cloudEnabled && !entry.forceCloud && (
+              <p className="text-sm text-fg-muted">
+                Archivo grande: en el navegador puede tardar varios minutos.{" "}
+                <button
+                  type="button"
+                  className="font-medium text-primary-accent underline-offset-2 hover:underline"
+                  onClick={() => setForceCloud(entry.id, true)}
+                >
+                  Procesar este archivo en la nube
+                </button>
+              </p>
+            )}
+            {entry.forceCloud && !cloudEnabled && (
+              <p className="inline-flex items-center gap-1.5 text-sm text-fg-muted">
+                <Cloud className="size-4" /> Se procesará en la nube.
+              </p>
+            )}
             {entry.cancelled && (
               <p className="text-sm text-fg-muted" role="status">
                 Compresión cancelada.

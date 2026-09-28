@@ -235,6 +235,20 @@ export function SettingsPanel() {
               value={spec.output.namePattern}
               onChange={(e) => setSpec((s) => ({ ...s, output: { ...s.output, namePattern: e.target.value || "{original}-comprimido" } }))}
             />
+            <Input
+              size="sm"
+              type="number"
+              inputMode="decimal"
+              min={0.1}
+              step={0.1}
+              label="Objetivo de tamaño (MB, opcional)"
+              hint="Prueba presets cada vez más agresivos hasta caber"
+              value={spec.output.targetSizeBytes ? String(Math.round((spec.output.targetSizeBytes / 1024 / 1024) * 10) / 10) : ""}
+              onChange={(e) => {
+                const mb = Number(e.target.value);
+                setSpec((s) => ({ ...s, output: { ...s.output, targetSizeBytes: Number.isFinite(mb) && mb > 0 ? Math.round(mb * 1024 * 1024) : null } }));
+              }}
+            />
           </div>
         </AccordionItem>
 

@@ -9,5 +9,7 @@ export {
   type CompressOutput,
 } from "./compress";
 export { estimateAll, estimateImage } from "./estimate";
+export { smartParams } from "./smart";
+export { compressToTarget } from "./target";
 export type { ImageOutcome } from "./images/process";
 export { loadMupdf, type Mu, type PDFDocument } from "./mupdf";

@@ -155,3 +155,27 @@ describe("compresión", () => {
     expect(stages.at(-1)).toBe("done");
   });
 });
+
+describe("inteligente y objetivo de tamaño", () => {
+  it("el preset inteligente adapta parámetros al tipo de documento", async () => {
+    const scan = makeScan(1700, 2200);
+    const pdf = buildPdf(mupdf, [{ images: [{ rgba: scan, x: 0, y: 0, w: 612, h: 792, encoding: { type: "jpeg", quality: 85 } }] }]);
+    const out = await compressBytes(pdf, defaultSpec("smart"), { fileName: "scan.pdf" });
+    expect(out.result.notes.some((n) => n.startsWith("Inteligente: documento scanned"))).toBe(true);
+    // 200 dpi sobre 612 pt = 1700 px de ancho → no se reduce por debajo de 1700
+    expect(out.images[0]!.width).toBe(1700);
+  });
+
+  it("objetivo de tamaño baja presets hasta cumplir", async () => {
+    const photo = makePhoto(2400, 1600, 5);
+    const pdf = buildPdf(mupdf, [
+      { images: [{ rgba: photo, x: 72, y: 200, w: 400, h: 267, encoding: { type: "jpeg", quality: 96 } }], text: LOREM },
+    ]);
+    const spec = defaultSpec("maximum");
+    spec.output.targetSizeBytes = 60_000;
+    const out = await compressBytes(pdf, spec, { fileName: "target.pdf" });
+    expect(out.bytes.length).toBeLessThanOrEqual(60_000);
+    expect(out.result.notes.some((n) => n.startsWith("Objetivo de tamaño alcanzado"))).toBe(true);
+    expect(out.result.preset).not.toBe("maximum");
+  });
+});

@@ -12,6 +12,8 @@ import { ghostscriptRasterize, ghostscriptRewrite, hasTool, ocrmypdf, qpdfCheck,
 import { WorkerClient } from "./worker-client";
 
 const active = new Map<string, AbortController>();
+/** Por encima de esto no se carga el PDF en el motor WASM (memoria): se usa Ghostscript nativo. */
+const NATIVE_THRESHOLD = 400 * 1024 * 1024;
 
 export function cancelJob(jobId: string): boolean {
   const c = active.get(jobId);
@@ -33,12 +35,18 @@ export async function runJob(payload: RunJobPayload, secret: string): Promise<vo
   const dir = await mkdtemp(path.join(tmpdir(), `prensa-${jobId.slice(0, 8)}-`));
   const notes: string[] = [];
   let lastReport = 0;
+  let lastState: { stage: "download" | "processing" | "upload"; progress: number; message?: string } = { stage: "download", progress: 0.02 };
   const report = async (stage: "download" | "processing" | "upload", progress: number, message?: string, force = false) => {
+    lastState = { stage, progress, message };
     const now = Date.now();
     if (!force && now - lastReport < 1000) return;
     lastReport = now;
     await client.progress(jobId, stage, progress, message);
   };
+  // Heartbeat: etapas largas sin salida (OCR pesado, Ghostscript en archivos enormes) no deben parecer colgadas.
+  const heartbeat = setInterval(() => {
+    if (Date.now() - lastReport > 45_000) void report(lastState.stage, lastState.progress, lastState.message, true);
+  }, 60_000);
 
   try {
     const input = path.join(dir, "input.pdf");
@@ -47,11 +55,16 @@ export async function runJob(payload: RunJobPayload, secret: string): Promise<vo
     await report("processing", 0.08, "Preparando", true);
 
     const spec = payload.spec;
-    const cloud = spec.cloud;
+    const cloud = { ...spec.cloud };
     const params = resolveImageParams(spec);
     const gray = spec.images.color !== "keep";
     let current = input;
     let step = 0;
+    const huge = inputSize > NATIVE_THRESHOLD;
+    if (huge && cloud.engine === "auto") {
+      cloud.engine = "ghostscript";
+      notes.push("Archivo muy grande: se usó Ghostscript nativo (los formularios se aplanan) para no agotar la memoria.");
+    }
 
     // ── OCR / JBIG2 (ocrmypdf) ──────────────────────────────────────
     const wantsOcr = cloud.ocr.enabled;
@@ -94,11 +107,16 @@ export async function runJob(payload: RunJobPayload, secret: string): Promise<vo
         const m = /Page (\d+)/.exec(line);
         if (m) void report("processing", 0.55, `Reescribiendo (página ${m[1]})`);
       });
-      // Pasada estructural sin pérdida del motor TS (dedupe, limpieza, subset verificado)
-      const res = await compressBytes(new Uint8Array(await readFile(out)), { ...spec, preset: "lossless", cloud: { ...cloud, enabled: false } }, { fileName: payload.fileName, signal });
-      await writeFile(output, res.bytes);
-      engineResult = res.result;
-      notes.push("Reescrito con Ghostscript (los formularios se aplanan)");
+      if (huge) {
+        // Sin pasada del motor WASM: el archivo no cabe en memoria.
+        output = out;
+      } else {
+        // Pasada estructural sin pérdida del motor TS (dedupe, limpieza, subset verificado)
+        const res = await compressBytes(new Uint8Array(await readFile(out)), { ...spec, preset: "lossless", cloud: { ...cloud, enabled: false } }, { fileName: payload.fileName, signal });
+        await writeFile(output, res.bytes);
+        engineResult = res.result;
+      }
+      if (!huge) notes.push("Reescrito con Ghostscript (los formularios se aplanan)");
     } else if (cloud.engine === "rasterize") {
       const out = path.join(dir, `raster-${++step}.pdf`);
       await ghostscriptRasterize(current, out, params.colorDpi ?? 150, gray, signal, (line) => {
@@ -144,7 +162,7 @@ export async function runJob(payload: RunJobPayload, secret: string): Promise<vo
       const check = await qpdfCheck(output, signal);
       if (check === "fail") throw new Error("El PDF resultante no pasó la verificación estructural (qpdf).");
     }
-    const result = await buildResult(payload, inputSize, output, outputSize, engineResult, notes, output === input);
+    const result = await buildResult(payload, inputSize, output, outputSize, engineResult, notes, output === input, huge);
 
     // ── Subir y reportar ────────────────────────────────────────────
     await report("upload", 0.95, "Subiendo el resultado", true);
@@ -154,6 +172,7 @@ export async function runJob(payload: RunJobPayload, secret: string): Promise<vo
     const cancelled = signal.aborted || (err instanceof DOMException && err.name === "AbortError");
     await client.failed(jobId, cancelled ? "CANCELLED" : err instanceof Error ? err.message : String(err));
   } finally {
+    clearInterval(heartbeat);
     active.delete(jobId);
     await rm(dir, { recursive: true, force: true }).catch(() => undefined);
   }
@@ -167,12 +186,16 @@ async function buildResult(
   engine: CompressionResult | null,
   notes: string[],
   returnedOriginal: boolean,
+  huge = false,
 ): Promise<CompressionResult> {
   const t0 = Date.now();
   const mupdf = await initNodeEngine();
   let pagesOk: boolean;
   let breakdownAfter: SizeBreakdown = { images: 0, fonts: 0, content: 0, metadata: 0, other: outputSize };
-  try {
+  if (huge) {
+    // Ni se analiza ni se abre en WASM: solo tamaños. qpdf --check ya validó la estructura.
+    pagesOk = true;
+  } else try {
     const outBytes = new Uint8Array(await readFile(output));
     const rep = await analyzeBytes(outBytes, payload.fileName);
     breakdownAfter = rep.report.breakdown;

@@ -20,6 +20,7 @@ import { get, resolveDict, streamLength } from "./pdf/objects";
 import { verifyOutput } from "./pdf/verify";
 import { walkDocument } from "./pdf/walk";
 import { rasterizeDocument } from "./rasterize";
+import { smartParams } from "./smart";
 
 export interface CompressOptions {
   fileName: string;
@@ -62,7 +63,7 @@ export async function compressPdf(
 ): Promise<CompressOutput> {
   const t0 = now();
   const spec = CompressionSpec.parse(specInput);
-  const params = resolveImageParams(spec);
+  let params = resolveImageParams(spec);
   const emit = (stage: Stage, progress: number, extra?: Partial<ProgressEvent>) =>
     opts.onProgress?.({ stage, progress: clamp01(progress), ...extra });
 
@@ -101,6 +102,21 @@ export async function compressPdf(
       onProgress: (p) => emit("analyze", 0.03 + 0.09 * p),
     });
     throwIfAborted(opts.signal);
+    if (spec.preset === "smart") {
+      // Inteligente: parámetros según el tipo de documento (los overrides manuales mandan).
+      const smart = smartParams(analysis.report);
+      params = resolveImageParams({ ...spec, preset: "balanced" });
+      params = {
+        ...smart,
+        colorDpi: spec.images.colorDpi ?? smart.colorDpi,
+        monoDpi: spec.images.monoDpi ?? smart.monoDpi,
+        photoQuality: spec.images.jpegQuality ?? smart.photoQuality,
+        graphicQuality: spec.images.jpegQuality != null ? Math.min(100, spec.images.jpegQuality + 8) : smart.graphicQuality,
+        chroma: spec.images.chroma === "auto" ? smart.chroma : spec.images.chroma,
+        minSsim: spec.images.minSsim ?? smart.minSsim,
+      };
+      notes.push(`Inteligente: documento ${analysis.report.docType} → ${params.colorDpi} dpi, JPEG ${params.photoQuality}`);
+    }
 
     // ── Imágenes ───────────────────────────────────────────────────
     const refs = [...analysis.walk.images.values()].sort(

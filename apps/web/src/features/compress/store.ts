@@ -40,6 +40,10 @@ export interface FileEntry {
   cancelled: boolean;
   /** Estado del trabajo en la nube (si el archivo se procesó allí) */
   cloud: JobState | null;
+  /** El usuario pidió procesar este archivo en la nube (p. ej. por tamaño) */
+  forceCloud: boolean;
+  /** Demasiado grande para analizar/comprimir en el navegador */
+  tooLargeForLocal: boolean;
 }
 
 interface CompressState {
@@ -64,12 +68,17 @@ interface CompressState {
   setCloudAccessCode: (code: string) => void;
   processInCloud: (id: string) => Promise<void>;
   deleteFromCloud: (id: string) => Promise<void>;
+  setForceCloud: (id: string, on: boolean) => void;
 }
 
 const watchers = new Map<string, () => void>();
 const uploadAborts = new Map<string, AbortController>();
 
 const MAX_FILES = 50;
+/** Por encima de esto el navegador se queda sin memoria WASM: solo nube. */
+export const LOCAL_HARD_LIMIT = 400 * 1024 * 1024;
+/** Por encima de esto recomendamos la nube (funciona en local, pero lento y con riesgo de memoria). */
+export const LOCAL_SOFT_LIMIT = 150 * 1024 * 1024;
 
 function patch(id: string, update: Partial<FileEntry>) {
   useCompressStore.setState((s) => ({ files: s.files.map((f) => (f.id === id ? { ...f, ...update } : f)) }));
@@ -96,6 +105,11 @@ function errorMessage(err: unknown): string {
 async function openAndAnalyze(id: string, password?: string): Promise<void> {
   const entry = getEntry(id);
   if (!entry) return;
+  if (entry.size > LOCAL_HARD_LIMIT) {
+    // No se abre en el navegador: quedaría sin memoria. Solo se puede procesar en la nube.
+    patch(id, { status: "ready", tooLargeForLocal: true });
+    return;
+  }
   try {
     const buffer = await entry.file.arrayBuffer();
     await pool.run(entry.slot, async (api) => {
@@ -154,6 +168,8 @@ export const useCompressStore = create<CompressState>()(
           error: null,
           cancelled: false,
           cloud: null,
+          forceCloud: false,
+          tooLargeForLocal: false,
         }));
         set({ files: [...current, ...entries] });
         for (const e of entries) void openAndAnalyze(e.id);
@@ -190,9 +206,13 @@ export const useCompressStore = create<CompressState>()(
       compressOne: async (id) => {
         const entry = getEntry(id);
         if (!entry || (entry.status !== "ready" && entry.status !== "done" && entry.status !== "error")) return;
-        if (!entry.report) return;
         const spec = get().spec;
-        if (spec.cloud.enabled) return get().processInCloud(id);
+        if (spec.cloud.enabled || entry.forceCloud) return get().processInCloud(id);
+        if (entry.tooLargeForLocal) {
+          patch(id, { status: "error", error: "Este archivo supera los 400 MB: solo se puede procesar en la nube." });
+          return;
+        }
+        if (!entry.report) return;
         if (entry.outputUrl) URL.revokeObjectURL(entry.outputUrl);
         patch(id, { status: "compressing", progress: { stage: "open", progress: 0 }, result: null, outputUrl: null, error: null, cancelled: false });
         try {
@@ -246,6 +266,7 @@ export const useCompressStore = create<CompressState>()(
 
       cloudAccessCode: "",
       setCloudAccessCode: (code) => set({ cloudAccessCode: code }),
+      setForceCloud: (id, on) => patch(id, { forceCloud: on }),
 
       processInCloud: async (id) => {
         const entry = getEntry(id);
@@ -394,10 +415,10 @@ export function selectTotals(files: FileEntry[], preset: PresetId) {
   let ready = 0;
   let done = 0;
   for (const f of files) {
-    if (f.report) {
+    if (f.report || (f.tooLargeForLocal && (f.status === "ready" || f.status === "error"))) {
       ready++;
       original += f.size;
-      estimated += f.report.estimates[preset]?.bytes ?? f.size;
+      estimated += f.report?.estimates[preset]?.bytes ?? Math.round(f.size * 0.6);
     }
     if (f.status === "done" && f.result) {
       done++;

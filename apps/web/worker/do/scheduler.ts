@@ -12,8 +12,8 @@ interface Running {
 
 const QUEUE_KEY = "queue";
 const RUNNING_KEY = "running";
-/** Sin progreso durante este tiempo → el trabajo se considera colgado */
-const STALE_MS = 25 * 60 * 1000;
+/** Sin progreso durante este tiempo → el trabajo se considera colgado (el runner hace heartbeat cada 60 s) */
+const STALE_MS = 15 * 60 * 1000;
 const TICK_MS = 60 * 1000;
 
 export class SchedulerDO extends DurableObject<Bindings> {
@@ -39,6 +39,10 @@ export class SchedulerDO extends DurableObject<Bindings> {
     if (jobId in running) {
       delete running[jobId];
       await this.ctx.storage.put(RUNNING_KEY, running);
+    }
+    // El contenedor de este trabajo ya no hace falta: pararlo ahorra los minutos de inactividad.
+    if (!this.env.ENGINE_DEV_URL) {
+      this.ctx.waitUntil(this.env.ENGINE.get(this.env.ENGINE.idFromName(jobId)).stop().catch(() => undefined));
     }
     await this.tick();
   }
@@ -133,11 +137,14 @@ export class SchedulerDO extends DurableObject<Bindings> {
   }
 
   private async engineFetch(jobId: string, path: string, body: unknown): Promise<Response> {
-    const init: RequestInit = {
-      method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${this.env.INTERNAL_SECRET}` },
-      body: JSON.stringify(body),
-    };
+    const init: RequestInit =
+      body === undefined
+        ? { method: "GET", headers: { authorization: `Bearer ${this.env.INTERNAL_SECRET}` } }
+        : {
+            method: "POST",
+            headers: { "content-type": "application/json", authorization: `Bearer ${this.env.INTERNAL_SECRET}` },
+            body: JSON.stringify(body),
+          };
     if (this.env.ENGINE_DEV_URL) return fetch(`${this.env.ENGINE_DEV_URL}${path}`, init);
     // Una instancia de contenedor por trabajo (aislamiento de memoria); max_instances limita la concurrencia.
     const container = this.env.ENGINE.get(this.env.ENGINE.idFromName(jobId));
@@ -165,6 +172,14 @@ export class SchedulerDO extends DurableObject<Bindings> {
         }
         delete running[jobId];
         changed = true;
+      } else {
+        // Mantener vivo el contenedor mientras el trabajo corre (sleepAfter cuenta
+        // inactividad de peticiones, no de trabajo): un ping cada minuto.
+        try {
+          await this.engineFetch(jobId, "/health", undefined);
+        } catch {
+          /* el watchdog lo marcará si no responde en STALE_MS */
+        }
       }
     }
     if (changed) await this.ctx.storage.put(RUNNING_KEY, running);

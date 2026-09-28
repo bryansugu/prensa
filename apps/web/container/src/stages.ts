@@ -5,7 +5,7 @@ import type { PresetDefinition } from "@prensa/schema";
 
 export class StageError extends Error {}
 
-const STAGE_TIMEOUT_MS = 20 * 60 * 1000;
+const STAGE_TIMEOUT_MS = 50 * 60 * 1000;
 
 export async function run(cmd: string, args: string[], signal: AbortSignal, onLine?: (line: string) => void): Promise<void> {
   await new Promise<void>((resolve, reject) => {
