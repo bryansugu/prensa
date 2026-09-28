@@ -12,8 +12,10 @@ export function smartParams(report: AnalysisReport): PresetDefinition {
   const imageShare = report.fileSize > 0 ? report.breakdown.images / report.fileSize : 0;
   switch (report.docType) {
     case "scanned":
-      // Texto escaneado: 200 dpi mantiene la legibilidad; el gris comprime bien.
-      return { ...base, colorDpi: 200, monoDpi: 400, photoQuality: 72, graphicQuality: 80, chroma: "420", minSsim: 0.93 };
+      // Texto escaneado: 150 dpi en gris/color se lee bien en pantalla y en
+      // impresión de oficina; el 1 bpc se queda en 400 dpi. El JPEG puede
+      // bajar porque el SSIM por imagen frena cualquier exceso.
+      return { ...base, colorDpi: 150, monoDpi: 400, photoQuality: 70, graphicQuality: 80, chroma: "420", minSsim: 0.93 };
     case "presentation":
       // Diapositivas: se ven en pantalla; 130 dpi es más que suficiente.
       return { ...base, colorDpi: 130, photoQuality: 72, graphicQuality: 82, chroma: "420", minSsim: 0.93 };

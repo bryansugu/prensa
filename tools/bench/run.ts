@@ -73,7 +73,13 @@ async function main() {
     const input = new Uint8Array(readFileSync(path.join(CORPUS, file)));
     for (const preset of presets) {
       const t0 = performance.now();
-      const res = await compressBytes(input, defaultSpec(preset), { fileName: file });
+      let res;
+      try {
+        res = await compressBytes(input, defaultSpec(preset), { fileName: file });
+      } catch (err) {
+        console.log(`${file.padEnd(28)} ${preset.padEnd(9)} ERROR ${err instanceof Error ? err.message : String(err)}`);
+        continue;
+      }
       const ms = Math.round(performance.now() - t0);
       const outFile = path.join(OUT, `${file.replace(/\.pdf$/i, "")}.${preset}.pdf`);
       writeFileSync(outFile, res.bytes);

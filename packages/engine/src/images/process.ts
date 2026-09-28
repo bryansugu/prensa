@@ -11,7 +11,7 @@ import { asName, asNumber, get, isStreamRef, objectNumber, resolveArray } from "
 import type { Placement } from "../pdf/placement";
 import type { ImageRef } from "../pdf/walk";
 import { classify, computeStats } from "./classify";
-import { deflate, isEffectivelyBilevel, packBilevel, quantizeExact, sauvolaBilevel, toGray8 } from "./encode";
+import { deflate, isEffectivelyBilevel, packBilevel, quantizeExact, sauvolaBilevel, toGray8, unpackBilevel } from "./encode";
 import { decodeBytes, decodeImage } from "./pixels";
 import { ssimScore } from "./quality";
 import type { RgbaImage } from "./types";
@@ -148,13 +148,18 @@ export async function processImage(
   if (forceBilevel || autoBilevel) {
     const g = toGray8(rgba, gray);
     const packed = sauvolaBilevel(g, rgba.width, rgba.height);
+    // En automático el B/N compite con los demás candidatos bajo la misma
+    // garantía de SSIM: un escaneo gris con ruido o antialiasing no se
+    // convierte a 1 bpc si el resultado se aleja del original.
+    const bilevelSsim = forceBilevel ? null : ssimScore(rgba, unpackBilevel(packed, rgba.width, rgba.height));
+    const bilevelOk = forceBilevel || Number.isNaN(bilevelSsim ?? NaN) || (bilevelSsim ?? 0) >= params.minSsim;
     // Para comparar tamaños usamos Flate; al guardar, MuPDF re-codifica los
     // streams bilevel sin filtro como CCITT G4 (opción "compress"), aún más chico.
-    const bytes = deflate(packed);
-    candidates.push({
+    const bytes = bilevelOk ? deflate(packed) : null;
+    if (bytes) candidates.push({
       codec: "bilevel",
       bytes,
-      ssim: null,
+      ssim: bilevelSsim,
       write: () => {
         target.writeStream(packed); // sin filtro → CCITT al guardar
         target.put("Width", rgba.width);

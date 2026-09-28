@@ -187,6 +187,7 @@ export function SettingsPanel() {
                 ["thumbnails", "Miniaturas embebidas"],
                 ["javascript", "JavaScript y acciones automáticas"],
                 ["pieceInfo", "Datos privados de aplicaciones (Illustrator, InDesign…)"],
+                ["xfa", "Datos XFA duplicados en formularios (el formulario sigue funcionando)"],
                 ["structureTree", "Estructura de accesibilidad"],
               ] as const
             ).map(([key, label]) => (

@@ -155,6 +155,13 @@ export const RemoveOptions = z.object({
   javascript: z.boolean().default(true),
   pieceInfo: z.boolean().default(true),
   alternates: z.boolean().default(true),
+  /**
+   * Paquetes XFA de formularios híbridos (AcroForm + XFA, típico de formularios
+   * oficiales hechos con Adobe LiveCycle). Duplican el formulario; sin ellos el
+   * AcroForm sigue funcionando en cualquier visor. Nunca se tocan los XFA
+   * dinámicos (NeedsRendering), que sí dependen de ellos.
+   */
+  xfa: z.boolean().default(true),
   /** keep = todo; basic = solo título/autor/asunto; none = nada (incluye XMP) */
   metadata: MetadataMode.default("basic"),
   structureTree: z.boolean().default(false),

@@ -13,13 +13,25 @@ File → Web Worker (packages/engine/src/worker/engine.worker.ts, Comlink)
                  1. bake() si se pide aplanar
                  2. analyze (sobre el doc a modificar)
                  3. images/process.ts por imagen (in-place, ver abajo)
-                 4. pdf/cleanup.ts (conservar / eliminar)
-                 5. saveToBuffer("garbage=deduplicate,compress,compress-fonts,compress-images,objstms,sanitize,encrypt=…")
+                 4. pdf/cleanup.ts (conservar / eliminar) + barrido de TODOS los objetos:
+                    /PieceInfo, PTEX.*, LastModified fuera (Illustrator/pdfTeX cuelgan KBs de cada figura)
+                 5. saveToBuffer("garbage=deduplicate,compress,compress-fonts,compress-images,objstms[,sanitize],encrypt=…")
+                    — se guarda con y sin `sanitize` (≤ 64 MB) y gana el más pequeño
                  6. subsetFonts() en copia, aceptado solo si el texto extraído es idéntico
                  7. pdf/verify.ts: páginas, texto, SSIM de página, anotaciones/formularios/marcadores
                  8. si falla la verificación o no ahorra → se devuelve el original con explicación
   renderPage()→ PNG para miniaturas / comparador
 ```
+
+Alrededor de `compressPdf` hay dos capas: `smart.ts` fija DPI/calidad según el tipo de documento cuando el
+preset es "Inteligente" (escaneado 150 dpi/q70, presentación 130/q72, texto con pocas imágenes 150/q82…), y
+`target.ts` (`compressToTarget`) recorre la escalera de presets (máx. 4 pasadas) cuando el usuario pide un
+tamaño objetivo.
+
+Límites locales: 150 MB (aviso, se sugiere la nube) y 400 MB (no se procesa en el navegador; botón
+"Procesar en la nube"). En la nube el tope es `CLOUD_MAX_BYTES` (2 GiB); por encima de 400 MB el
+contenedor salta el análisis WASM y usa Ghostscript nativo directamente (`NATIVE_THRESHOLD` en
+`container/src/job.ts`).
 
 ## Por imagen (`images/process.ts`)
 
@@ -29,8 +41,9 @@ File → Web Worker (packages/engine/src/worker/engine.worker.ts, Comlink)
 4. Paleta exacta (≤256 colores) calculada antes de redimensionar (gráficos).
 5. Redimensionar (Lanczos3) al DPI objetivo relativo al tamaño dibujado; si había paleta,
    re-mapear al color más cercano para que siga siendo exacta.
-6. Candidatos: bilevel (Sauvola → 1 bpc, CCITT al guardar) · indexado/gris Flate · JPEG mozjpeg
-   con verificación SSIM ≥ mínimo del preset (sube la calidad en pasos de 6 hasta 95).
+6. Candidatos: bilevel (Sauvola → 1 bpc, CCITT al guardar; en automático solo si su SSIM contra el
+   original supera el mínimo) · indexado/gris Flate · JPEG mozjpeg con verificación SSIM ≥ mínimo del
+   preset (sube la calidad en pasos de 6 hasta 95).
 7. Gana el más pequeño que supere el SSIM y ahorre ≥ 3 %. Se escribe con `writeRawStream` sobre
    la referencia indirecta y se actualiza el diccionario; la `/SMask` se redimensiona al mismo tamaño.
 
@@ -57,6 +70,10 @@ workers (`engine-pool.ts`, hasta 3 workers, un archivo vive en un worker). UI co
 
 `pnpm bench` (tools/bench/run.ts) corre presets sobre `tools/bench/corpus/*.pdf` y escribe
 `tools/bench/out/report.md` con tamaño, ahorro, tiempo, SSIM de página, texto, interactividad y `qpdf --check`.
+Herramientas auxiliares: `tools/bench/breakdown.ts` (dónde están los bytes de un PDF: imágenes, fuentes por
+tipo, contenido, diccionarios) y `tools/bench/cloud-run.ts` (corre un archivo por la nube de producción desde
+la terminal). Resultados y comparación con iLovePDF en `docs/benchmarks.md`; contrato para nuevas
+herramientas en `docs/TOOLS.md`.
 
 ## Accesibilidad
 

@@ -162,8 +162,102 @@ describe("inteligente y objetivo de tamaño", () => {
     const pdf = buildPdf(mupdf, [{ images: [{ rgba: scan, x: 0, y: 0, w: 612, h: 792, encoding: { type: "jpeg", quality: 85 } }] }]);
     const out = await compressBytes(pdf, defaultSpec("smart"), { fileName: "scan.pdf" });
     expect(out.result.notes.some((n) => n.startsWith("Inteligente: documento scanned"))).toBe(true);
-    // 200 dpi sobre 612 pt = 1700 px de ancho → no se reduce por debajo de 1700
-    expect(out.images[0]!.width).toBe(1700);
+    // Escaneado → 150 dpi sobre 612 pt (8,5 in) = 1275 px de ancho
+    expect(out.images[0]!.width).toBe(1275);
+  });
+
+  it("barre /PieceInfo y datos privados también fuera del catálogo y las páginas", async () => {
+    const photo = makePhoto(600, 400, 3);
+    const base = buildPdf(mupdf, [{ images: [{ rgba: photo, x: 72, y: 200, w: 300, h: 200, encoding: { type: "jpeg", quality: 90 } }] }]);
+    // Datos privados incompresibles colgados de la página y del XObject de imagen (como hace Illustrator).
+    const doc = new mupdf.PDFDocument(base);
+    const junk = new Uint8Array(200_000);
+    for (let i = 0; i < junk.length; i++) junk[i] = (Math.random() * 256) | 0;
+    const makePieceInfo = () => {
+      const priv = doc.newDictionary();
+      priv.put("Private", doc.addStream(junk, {}));
+      const pi = doc.newDictionary();
+      pi.put("Illustrator", priv);
+      return pi;
+    };
+    const page = doc.findPage(0);
+    page.put("PieceInfo", makePieceInfo());
+    page.put("LastModified", doc.newString("D:20260101000000Z"));
+    const xobjects = page.get("Resources").get("XObject");
+    xobjects.forEach((ref) => {
+      ref.put("PieceInfo", makePieceInfo());
+      ref.put("PTEX.FileName", doc.newString("./figura.pdf"));
+    });
+    const dirty = new Uint8Array(doc.saveToBuffer("compress").asUint8Array());
+    doc.destroy();
+
+    const kept = await compressBytes(dirty, { preset: "lossless", remove: { pieceInfo: false } }, { fileName: "priv.pdf" });
+    const swept = await compressBytes(dirty, { preset: "lossless", remove: { pieceInfo: true } }, { fileName: "priv.pdf" });
+    // Dos streams de 200 KB de ruido desaparecen solo con el barrido.
+    expect(kept.bytes.length - swept.bytes.length).toBeGreaterThan(350_000);
+    expect(swept.result.notes.some((n) => n.startsWith("Datos privados de aplicación eliminados"))).toBe(true);
+    const check = new mupdf.PDFDocument(swept.bytes);
+    const outPage = check.findPage(0);
+    expect(outPage.get("PieceInfo").isNull()).toBe(true);
+    expect(outPage.get("LastModified").isNull()).toBe(true);
+    outPage
+      .get("Resources")
+      .get("XObject")
+      .forEach((ref) => {
+        expect(ref.get("PieceInfo").isNull()).toBe(true);
+        expect(ref.get("PTEX.FileName").isNull()).toBe(true);
+        expect(ref.isStream()).toBe(true); // la imagen sigue ahí
+      });
+    check.destroy();
+  });
+
+  it("quita el XFA duplicado de un formulario híbrido y conserva el AcroForm", async () => {
+    const base = buildPdf(mupdf, [{ text: LOREM }]);
+    const doc = new mupdf.PDFDocument(base);
+    const root = doc.getTrailer().get("Root");
+    const page = doc.findPage(0);
+    const field = doc.newDictionary();
+    field.put("Type", doc.newName("Annot"));
+    field.put("Subtype", doc.newName("Widget"));
+    field.put("FT", doc.newName("Tx"));
+    field.put("T", doc.newString("nombre"));
+    field.put("F", 4);
+    const rect = doc.newArray();
+    for (const v of [72, 72, 300, 100]) rect.push(v);
+    field.put("Rect", rect);
+    field.put("P", page);
+    const fieldRef = doc.addObject(field);
+    const annots = doc.newArray();
+    annots.push(fieldRef);
+    page.put("Annots", annots);
+    const fields = doc.newArray();
+    fields.push(fieldRef);
+    const xfaJunk = new Uint8Array(60_000);
+    for (let i = 0; i < xfaJunk.length; i++) xfaJunk[i] = (Math.random() * 256) | 0;
+    const xfa = doc.newArray();
+    xfa.push(doc.newString("template"));
+    xfa.push(doc.addStream(xfaJunk, {}));
+    const acro = doc.newDictionary();
+    acro.put("Fields", fields);
+    acro.put("XFA", xfa);
+    root.put("AcroForm", acro);
+    const hybrid = new Uint8Array(doc.saveToBuffer("compress").asUint8Array());
+    doc.destroy();
+
+    const out = await compressBytes(hybrid, { preset: "lossless" }, { fileName: "form.pdf" });
+    expect(out.result.notes.some((n) => n.startsWith("Datos XFA duplicados eliminados"))).toBe(true);
+    expect(out.result.verification.interactivityOk).toBe(true);
+    expect(hybrid.length - out.bytes.length).toBeGreaterThan(50_000);
+    const check = new mupdf.PDFDocument(out.bytes);
+    const outAcro = check.getTrailer().get("Root").get("AcroForm");
+    expect(outAcro.get("XFA").isNull()).toBe(true);
+    expect(outAcro.get("Fields").length).toBe(1);
+    check.destroy();
+
+    const keep = await compressBytes(hybrid, { preset: "lossless", remove: { xfa: false } }, { fileName: "form.pdf" });
+    const check2 = new mupdf.PDFDocument(keep.bytes);
+    expect(check2.getTrailer().get("Root").get("AcroForm").get("XFA").isNull()).toBe(false);
+    check2.destroy();
   });
 
   it("objetivo de tamaño baja presets hasta cumplir", async () => {

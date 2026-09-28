@@ -1,6 +1,6 @@
 /** Codificadores sin pérdida y utilidades de empaquetado para PDF. */
 import { zlibSync } from "fflate";
-import type { RgbaImage } from "./types";
+import { createRgba, type RgbaImage } from "./types";
 
 export function deflate(data: Uint8Array): Uint8Array {
   return zlibSync(data, { level: 9, mem: 12 });
@@ -77,6 +77,25 @@ export function packBilevel(gray: Uint8Array, width: number, height: number, thr
         const o = rowOut + (x >> 3);
         out[o] = (out[o] ?? 0) | (0x80 >> (x & 7));
       }
+    }
+  }
+  return out;
+}
+
+/** Expande 1 bpc empaquetado (1 = blanco) a RGBA opaca, para medir SSIM contra el original. */
+export function unpackBilevel(packed: Uint8Array, width: number, height: number): RgbaImage {
+  const rowBytes = (width + 7) >> 3;
+  const out = createRgba(width, height);
+  const d = out.data;
+  for (let y = 0; y < height; y++) {
+    const rowIn = y * rowBytes;
+    let p = y * width * 4;
+    for (let x = 0; x < width; x++, p += 4) {
+      const v = ((packed[rowIn + (x >> 3)] ?? 0) >> (7 - (x & 7))) & 1 ? 255 : 0;
+      d[p] = v;
+      d[p + 1] = v;
+      d[p + 2] = v;
+      d[p + 3] = 255;
     }
   }
   return out;

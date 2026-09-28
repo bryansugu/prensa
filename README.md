@@ -16,4 +16,4 @@ pnpm dev           # http://localhost:5173
 pnpm test
 ```
 
-Más en `CLAUDE.md` y `docs/PLAN.md`.
+Más en `CLAUDE.md`, `docs/PLAN.md`, `docs/ARCHITECTURE.md`, `docs/benchmarks.md` (comparación con iLovePDF) y `docs/TOOLS.md` (cómo añadir herramientas).

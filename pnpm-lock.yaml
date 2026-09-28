@@ -329,6 +329,9 @@ importers:
       '@prensa/schema':
         specifier: workspace:*
         version: link:../packages/schema
+      mupdf:
+        specifier: ^1.28.1
+        version: 1.28.1
 
 packages:
 
