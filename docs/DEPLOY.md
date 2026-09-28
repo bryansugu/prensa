@@ -11,7 +11,7 @@ Todo se despliega solo con cada push a `main` (Workers Builds y Pages Git integr
 - Worker `prensa` conectado a GitHub con Workers Builds (root `apps/web`); URL `https://prensa.bsuarezg.workers.dev`.
   Secreto `INTERNAL_SECRET` cargado. Contenedor `prensa-enginecontainer` creado (standard-3, máx. 2).
 - Pages `prensa-domain` conectado (root `apps/domain`) → `https://prensa-domain.pages.dev` reenvía al Worker.
-- Pendiente: custom domain `pdf.cdc.cool` en Pages + `CNAME pdf → prensa-domain.pages.dev` en GoDaddy.
+- `https://pdf.cdc.cool` activo: custom domain en Pages + `CNAME pdf → prensa-domain.pages.dev` en GoDaddy (certificado emitido).
 
 ## Paso 1 — Conectar el Worker al repo (Workers Builds)
 
