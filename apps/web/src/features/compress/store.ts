@@ -6,8 +6,10 @@ import { Comlink, progressProxy } from "@prensa/engine/client";
 import {
   CompressionSpec,
   defaultSpec,
+  formatBytes,
   outputFileName,
   type AnalysisReport,
+  type CloudConfig,
   type CompressionResult,
   type JobState,
   type PresetId,
@@ -15,7 +17,8 @@ import {
 } from "@prensa/schema";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { cancelCloudJob, createCloudJob, deleteCloudJob, uploadToCloud, watchCloudJob } from "./cloud";
+import { estimateLocalMemoryNeed, isFatalEngineError, isMemoryError, memoryProfile } from "@/lib/memory";
+import { cancelCloudJob, createCloudJob, deleteCloudJob, fetchCloudConfig, uploadToCloud, watchCloudJob } from "./cloud";
 import { pool } from "./engine-pool";
 import { useHistoryStore } from "./history";
 
@@ -44,6 +47,8 @@ export interface FileEntry {
   forceCloud: boolean;
   /** Demasiado grande para analizar/comprimir en el navegador */
   tooLargeForLocal: boolean;
+  /** El archivo pasó a la nube automáticamente porque el navegador se quedó sin memoria */
+  rescued: "memory" | null;
 }
 
 interface CompressState {
@@ -69,16 +74,70 @@ interface CompressState {
   processInCloud: (id: string) => Promise<void>;
   deleteFromCloud: (id: string) => Promise<void>;
   setForceCloud: (id: string, on: boolean) => void;
+  /** Si el navegador se queda sin memoria, continuar en la nube sin preguntar */
+  autoRescue: boolean;
+  setAutoRescue: (on: boolean) => void;
+  /** Configuración pública de la nube (se carga una vez; null si no está disponible) */
+  cloudConfig: CloudConfig | null;
 }
 
 const watchers = new Map<string, () => void>();
 const uploadAborts = new Map<string, AbortController>();
 
 const MAX_FILES = 50;
-/** Por encima de esto el navegador se queda sin memoria WASM: solo nube. */
-export const LOCAL_HARD_LIMIT = 400 * 1024 * 1024;
+/** Memoria detectada en este navegador; fija los límites de tamaño para procesar en local. */
+export const MEMORY = memoryProfile();
+/** Por encima de esto el navegador se queda sin memoria WASM: solo nube (depende de la RAM del equipo, máx. 400 MB). */
+export const LOCAL_HARD_LIMIT = MEMORY.hardLimit;
 /** Por encima de esto recomendamos la nube (funciona en local, pero lento y con riesgo de memoria). */
-export const LOCAL_SOFT_LIMIT = 150 * 1024 * 1024;
+export const LOCAL_SOFT_LIMIT = MEMORY.softLimit;
+
+let cloudConfigPromise: Promise<void> | null = null;
+/** Carga la configuración de la nube una sola vez (para saber si el rescate automático es posible). */
+function ensureCloudConfig(): Promise<void> {
+  if (!cloudConfigPromise) {
+    cloudConfigPromise = fetchCloudConfig()
+      .then((c): void => {
+        useCompressStore.setState({ cloudConfig: c });
+      })
+      .catch((): void => undefined);
+  }
+  return cloudConfigPromise;
+}
+
+/** ¿Podemos mandar este archivo a la nube sin preguntar nada más? */
+function cloudAvailableFor(size: number): boolean {
+  const { cloudConfig, cloudAccessCode } = useCompressStore.getState();
+  if (!cloudConfig?.enabled) return false;
+  if (size > cloudConfig.maxBytes) return false;
+  return !cloudConfig.requiresAccessCode || cloudAccessCode.length > 0;
+}
+
+function largestImagePixels(report: AnalysisReport | null): number {
+  let max = 0;
+  for (const img of report?.images ?? []) max = Math.max(max, img.width * img.height);
+  return max;
+}
+
+/**
+ * El módulo WASM del slot quedó inutilizable: se recrea el worker y se
+ * vuelven a abrir los demás archivos que vivían en él.
+ */
+function recoverSlot(slot: number, exceptId: string): void {
+  pool.reset(slot);
+  for (const f of useCompressStore.getState().files) {
+    if (f.slot !== slot || f.id === exceptId || f.tooLargeForLocal) continue;
+    if (f.status === "ready" || f.status === "done" || f.status === "error") {
+      patch(f.id, { status: "opening" });
+      void openAndAnalyze(f.id, useCompressStore.getState().spec.password);
+    }
+  }
+}
+
+/** Solo en desarrollo: `?simular-oom` hace que la compresión local falle por memoria (para probar el rescate). */
+function simulatedOom(): boolean {
+  return import.meta.env.DEV && typeof location !== "undefined" && new URLSearchParams(location.search).has("simular-oom");
+}
 
 function patch(id: string, update: Partial<FileEntry>) {
   useCompressStore.setState((s) => ({ files: s.files.map((f) => (f.id === id ? { ...f, ...update } : f)) }));
@@ -134,7 +193,11 @@ async function openAndAnalyze(id: string, password?: string): Promise<void> {
   } catch (err) {
     const message = errorMessage(err);
     if (message === "PASSWORD_REQUIRED") patch(id, { status: "password", error: password ? "Contraseña incorrecta." : null });
-    else patch(id, { status: "error", error: message });
+    else if (isMemoryError(err)) {
+      // No cabe ni para analizarlo: queda como "solo nube" (y el rescate lo manda solo si está activo).
+      if (isFatalEngineError(err)) recoverSlot(entry.slot, id);
+      patch(id, { status: "ready", tooLargeForLocal: true, error: null });
+    } else patch(id, { status: "error", error: message });
   }
 }
 
@@ -170,8 +233,10 @@ export const useCompressStore = create<CompressState>()(
           cloud: null,
           forceCloud: false,
           tooLargeForLocal: false,
+          rescued: null,
         }));
         set({ files: [...current, ...entries] });
+        void ensureCloudConfig();
         for (const e of entries) void openAndAnalyze(e.id);
       },
 
@@ -208,14 +273,28 @@ export const useCompressStore = create<CompressState>()(
         if (!entry || (entry.status !== "ready" && entry.status !== "done" && entry.status !== "error")) return;
         const spec = get().spec;
         if (spec.cloud.enabled || entry.forceCloud) return get().processInCloud(id);
+        await ensureCloudConfig();
+        const canRescue = get().autoRescue && cloudAvailableFor(entry.size);
+        const rescue = () => {
+          patch(id, { rescued: "memory", tooLargeForLocal: true, progress: null });
+          return get().processInCloud(id);
+        };
         if (entry.tooLargeForLocal) {
-          patch(id, { status: "error", error: "Este archivo supera los 400 MB: solo se puede procesar en la nube." });
+          if (canRescue) return rescue();
+          patch(id, {
+            status: "error",
+            error: `Este archivo (${formatBytes(entry.size)}) supera lo que cabe en la memoria de este navegador (${formatBytes(LOCAL_HARD_LIMIT)}). Procésalo en la nube.`,
+          });
           return;
         }
         if (!entry.report) return;
+        // Antes de intentarlo: ¿cabe en la memoria que tiene este navegador?
+        const need = estimateLocalMemoryNeed(entry.size, largestImagePixels(entry.report));
+        if (need > MEMORY.budget && canRescue) return rescue();
         if (entry.outputUrl) URL.revokeObjectURL(entry.outputUrl);
-        patch(id, { status: "compressing", progress: { stage: "open", progress: 0 }, result: null, outputUrl: null, error: null, cancelled: false });
+        patch(id, { status: "compressing", progress: { stage: "open", progress: 0 }, result: null, outputUrl: null, error: null, cancelled: false, rescued: null });
         try {
+          if (simulatedOom()) throw new Error("out of memory (simulación)");
           const { bytes, result } = await pool.run(entry.slot, (api) =>
             api.compress(
               id,
@@ -247,8 +326,24 @@ export const useCompressStore = create<CompressState>()(
         } catch (err) {
           if (!getEntry(id)) return;
           const message = errorMessage(err);
-          if (message === "CANCELLED") patch(id, { status: "ready", progress: null, cancelled: true });
-          else patch(id, { status: "error", error: message, progress: null });
+          if (message === "CANCELLED") {
+            patch(id, { status: "ready", progress: null, cancelled: true });
+            return;
+          }
+          if (isMemoryError(err)) {
+            // Rescate: el navegador no pudo con el archivo. Si el worker murió, se recrea
+            // y se reabren los otros archivos; este sigue en la nube (o queda a un clic de ella).
+            if (isFatalEngineError(err)) recoverSlot(entry.slot, id);
+            if (canRescue) return rescue();
+            patch(id, {
+              status: "ready",
+              tooLargeForLocal: true,
+              error: "El navegador se quedó sin memoria con este archivo.",
+              progress: null,
+            });
+            return;
+          }
+          patch(id, { status: "error", error: message, progress: null });
         }
       },
 
@@ -350,6 +445,10 @@ export const useCompressStore = create<CompressState>()(
       notify: false,
       setNotify: (on) => set({ notify: on }),
 
+      autoRescue: true,
+      setAutoRescue: (on) => set({ autoRescue: on }),
+      cloudConfig: null,
+
       compressAll: async () => {
         const ids = get()
           .files.filter((f) => f.status === "ready" || f.status === "done" || f.status === "error")
@@ -373,15 +472,16 @@ export const useCompressStore = create<CompressState>()(
       name: "prensa:compress-spec",
       version: 1,
       // Solo persistimos los ajustes (sin contraseña) y la preferencia de aviso; los archivos viven en memoria.
-      partialize: (s) => ({ spec: { ...s.spec, password: undefined }, notify: s.notify, cloudAccessCode: s.cloudAccessCode }),
+      partialize: (s) => ({ spec: { ...s.spec, password: undefined }, notify: s.notify, cloudAccessCode: s.cloudAccessCode, autoRescue: s.autoRescue }),
       merge: (persisted, current) => {
-        const p = persisted as { spec?: unknown; notify?: unknown; cloudAccessCode?: unknown } | undefined;
+        const p = persisted as { spec?: unknown; notify?: unknown; cloudAccessCode?: unknown; autoRescue?: unknown } | undefined;
         const parsed = CompressionSpec.safeParse(p?.spec);
         return {
           ...current,
           spec: parsed.success ? parsed.data : current.spec,
           notify: p?.notify === true,
           cloudAccessCode: typeof p?.cloudAccessCode === "string" ? p.cloudAccessCode : "",
+          autoRescue: p?.autoRescue !== false,
         };
       },
     },

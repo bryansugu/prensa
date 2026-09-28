@@ -28,10 +28,22 @@ preset es "Inteligente" (escaneado 150 dpi/q70, presentación 130/q72, texto con
 `target.ts` (`compressToTarget`) recorre la escalera de presets (máx. 4 pasadas) cuando el usuario pide un
 tamaño objetivo.
 
-Límites locales: 150 MB (aviso, se sugiere la nube) y 400 MB (no se procesa en el navegador; botón
-"Procesar en la nube"). En la nube el tope es `CLOUD_MAX_BYTES` (2 GiB); por encima de 400 MB el
+## Local o nube: cómo se decide
+
+`apps/web/src/lib/memory.ts` detecta la memoria del navegador (`navigator.deviceMemory` en Chrome/Edge;
+en Firefox/Safari se estima por tipo de dispositivo) y fija un presupuesto para el motor (≈35 % de la RAM,
+tope 2 GiB en escritorio y 1 GiB en móvil). De ahí salen los límites: **aviso** (presupuesto/10, máx. 150 MB)
+y **duro** (presupuesto/4, máx. 400 MB). En un equipo de 8 GB son 150/400 MB; en uno de 2 GB, 71/179 MB.
+
+Antes de comprimir se estima la memoria que hará falta (3,5× el archivo + la imagen más grande decodificada
+×3) y, si supera el presupuesto, el archivo va directo a la nube. Si a pesar de todo el motor falla por
+memoria (error de MuPDF, abort del WASM o muerte del worker, que el pool detecta con la promesa `crashed`
+del handle), el **rescate automático** manda el archivo a la nube y lo marca en la tarjeta; si el worker
+murió se recrea y los demás archivos del slot se reabren. El rescate se puede apagar en Ajustes → Nube
+("Rescate automático"); entonces la tarjeta ofrece el botón manual. La nube es obligatoria para OCR,
+JBIG2 y los motores Ghostscript/Rasterizar, y su tope es `CLOUD_MAX_BYTES` (2 GiB); por encima de 400 MB el
 contenedor salta el análisis WASM y usa Ghostscript nativo directamente (`NATIVE_THRESHOLD` en
-`container/src/job.ts`).
+`container/src/job.ts`). En desarrollo, `?simular-oom` fuerza el fallo de memoria para probar el flujo.
 
 ## Por imagen (`images/process.ts`)
 

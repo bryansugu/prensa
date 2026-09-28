@@ -12,7 +12,7 @@ import { BreakdownBar } from "./BreakdownBar";
 import { CompareViewer } from "./CompareViewer";
 import { downloadUrl } from "@/lib/download";
 import { DOC_TYPE_LABEL, FEATURE_FLAGS, STAGE_LABEL, formatPercent } from "./presets";
-import { LOCAL_SOFT_LIMIT, useCompressStore, type FileEntry } from "./store";
+import { LOCAL_HARD_LIMIT, LOCAL_SOFT_LIMIT, MEMORY, useCompressStore, type FileEntry } from "./store";
 
 export function FileCard({ entry }: { entry: FileEntry }) {
   const preset = useCompressStore((s) => s.spec.preset);
@@ -120,12 +120,18 @@ export function FileCard({ entry }: { entry: FileEntry }) {
           </form>
         )}
 
-        {entry.status === "ready" && entry.tooLargeForLocal && (
+        {entry.rescued === "memory" && (
+          <p role="status" className="inline-flex items-center gap-1.5 text-sm text-warning-text">
+            <Cloud className="size-4 shrink-0" /> El navegador se quedó sin memoria con este archivo: continúa en la nube.
+          </p>
+        )}
+
+        {entry.status === "ready" && entry.tooLargeForLocal && !entry.rescued && (
           <Alert
             color="warning"
             size="sm"
             role="none"
-            title="Demasiado grande para el navegador"
+            title={entry.error ?? "Demasiado grande para este navegador"}
             action={
               <Button
                 variant="tonal"
@@ -140,7 +146,7 @@ export function FileCard({ entry }: { entry: FileEntry }) {
               </Button>
             }
           >
-            Más de 400 MB no caben en la memoria del navegador. En la nube se procesa hasta 2 GB; el archivo se sube cifrado y se borra a las 24 h.
+            Este navegador{MEMORY.deviceGiB ? ` (≈${MEMORY.deviceGiB} GB de RAM)` : ""} procesa en local hasta {formatBytes(LOCAL_HARD_LIMIT)}. En la nube se procesa hasta 2 GB; el archivo se sube cifrado y se borra a las 24 h.
           </Alert>
         )}
 
@@ -148,7 +154,7 @@ export function FileCard({ entry }: { entry: FileEntry }) {
           <div className="flex flex-col gap-2">
             {entry.size > LOCAL_SOFT_LIMIT && !cloudEnabled && !entry.forceCloud && (
               <p className="text-sm text-fg-muted">
-                Archivo grande: en el navegador puede tardar varios minutos.{" "}
+                Archivo grande para este equipo: en el navegador puede tardar varios minutos.{" "}
                 <button
                   type="button"
                   className="font-medium text-primary-accent underline-offset-2 hover:underline"

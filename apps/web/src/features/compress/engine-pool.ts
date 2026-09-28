@@ -45,10 +45,13 @@ export class EnginePool {
   run<T>(slot: number, fn: (api: EngineClient) => Promise<T>): Promise<T> {
     const s = this.slots[slot];
     if (!s) return Promise.reject(new Error(`slot inválido: ${slot}`));
-    const task = s.queue.then(
-      () => fn(this.api(slot)),
-      () => fn(this.api(slot)),
-    );
+    // Si el worker muere a mitad (sin memoria), Comlink nunca respondería: la
+    // promesa `crashed` del handle rechaza y la operación termina con error.
+    const exec = () => {
+      const h = this.handle(slot);
+      return Promise.race([fn(h.api), h.crashed]);
+    };
+    const task = s.queue.then(exec, exec);
     s.queue = task.catch(() => undefined);
     return task;
   }
@@ -74,10 +77,14 @@ export class EnginePool {
     await this.api(0).warmup();
   }
 
-  private api(slot: number): EngineClient {
+  private handle(slot: number): EngineHandle {
     const s = this.slots[slot]!;
     s.handle ??= createEngine();
-    return s.handle.api;
+    return s.handle;
+  }
+
+  private api(slot: number): EngineClient {
+    return this.handle(slot).api;
   }
 }
 

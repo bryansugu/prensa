@@ -9,7 +9,7 @@ import { Switch } from "@/components/ds/switch";
 import { cn } from "@/lib/cn";
 import { PRESET_META, formatPercent } from "./presets";
 import { useProfilesStore } from "./profiles";
-import { selectTotals, useCompressStore } from "./store";
+import { LOCAL_HARD_LIMIT, MEMORY, selectTotals, useCompressStore } from "./store";
 import { useCloudConfig } from "./useCloudConfig";
 
 const DPI_OPTIONS = [
@@ -33,6 +33,8 @@ export function SettingsPanel() {
   const [profileName, setProfileName] = useState("");
   const cloudConfig = useCloudConfig();
   const cloudAccessCode = useCompressStore((s) => s.cloudAccessCode);
+  const autoRescue = useCompressStore((s) => s.autoRescue);
+  const setAutoRescue = useCompressStore((s) => s.setAutoRescue);
   const setCloudAccessCode = useCompressStore((s) => s.setCloudAccessCode);
   const cloud = spec.cloud;
   const setCloud = (patch: Partial<typeof cloud>) => setSpec((s) => ({ ...s, cloud: { ...s.cloud, ...patch } }));
@@ -265,6 +267,13 @@ export function SettingsPanel() {
                   supporting={`OCR, JBIG2 y archivos enormes (hasta ${formatBytes(cloudConfig.maxBytes)}). Se sube cifrado, se procesa y se borra a las ${cloudConfig.ttlHours} h.`}
                   checked={cloud.enabled}
                   onCheckedChange={(checked) => setCloud({ enabled: checked })}
+                />
+                <Switch
+                  size="sm"
+                  label="Rescate automático"
+                  supporting={`Si el navegador se queda sin memoria, el archivo continúa en la nube. Este equipo${MEMORY.deviceGiB ? ` (≈${MEMORY.deviceGiB} GB de RAM)` : ""} procesa en local hasta ${formatBytes(LOCAL_HARD_LIMIT)}.`}
+                  checked={autoRescue}
+                  onCheckedChange={(checked) => setAutoRescue(checked)}
                 />
                 {cloud.enabled && (
                   <>
