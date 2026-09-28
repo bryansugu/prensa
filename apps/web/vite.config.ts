@@ -16,11 +16,11 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["favicon.svg", "icon-64.png", "fonts/PPNeueMontreal-wght.woff2"],
+      includeAssets: ["favicon.svg", "icon-64.png", "apple-touch-icon.png", "fonts/PPNeueMontreal-wght.woff2"],
       manifest: {
-        name: "Prensa · Compresor PDF",
+        name: "Prensa · Compresor PDF del Centro de Diseño",
         short_name: "Prensa",
-        description: "Comprime PDF con la mejor calidad, sin subir nada: el motor corre en tu dispositivo.",
+        description: "Comprime PDF con la mejor calidad, sin subir nada: el motor corre en tu dispositivo. Una herramienta del Centro de Diseño y Comunicación.",
         lang: "es",
         start_url: "/",
         display: "standalone",

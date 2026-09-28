@@ -5,6 +5,7 @@
   "type": "module",
   "license": "AGPL-3.0-only",
   "scripts": {
+    "icons": "node scripts/make-icons.mjs",
     "dev": "vite",
     "build": "vite build && tsx container/build.ts",
     "preview": "vite preview",

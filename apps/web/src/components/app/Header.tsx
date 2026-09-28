@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { BRAND } from "@/lib/brand";
+import { CdcLogo } from "./CdcLogo";
 import { ThemeToggle } from "./ThemeToggle";
 
 const TOOLS = [
@@ -18,16 +19,17 @@ export function Header() {
         Saltar al contenido
       </a>
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-6 px-4 sm:px-6">
-        <Link to="/" className="flex items-center gap-2.5 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring">
-          <span
-            aria-hidden
-            className="grid size-8 place-items-center rounded-lg bg-primary text-primary-fg"
-          >
-            <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-              <path d="M5 7h10M5 10h10M5 13h10M10 3v2M10 15v2" />
-            </svg>
+        <Link
+          to="/"
+          aria-label={`${BRAND.name} · ${BRAND.org.name}`}
+          className="flex items-center gap-3 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+        >
+          <CdcLogo aria-hidden className="h-9 w-auto shrink-0 text-fg" />
+          <span aria-hidden className="h-8 w-px bg-border" />
+          <span className="flex flex-col leading-tight">
+            <span className="text-base font-semibold tracking-tight">{BRAND.name}</span>
+            <span className="font-mono text-[11px] text-fg-muted">{BRAND.host}</span>
           </span>
-          <span className="text-lg font-semibold tracking-tight">{BRAND.name}</span>
         </Link>
         <nav aria-label="Herramientas" className="hidden items-center gap-1 md:flex">
           {TOOLS.map((tool) => (
